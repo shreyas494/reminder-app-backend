@@ -5,18 +5,32 @@ import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
 
+// Routes
 import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import reminderRoutes from "./routes/reminderRoutes.js";
 import contactRoutes from "./routes/contacts.js";
 
-// ⏰ CRON (production)
+// Cron
 import "./cron/reminderCron.js";
 
 const app = express();
 
-/* ---------- MIDDLEWARE ---------- */
-app.use(cors());
+/* ---------- CORS (IMPORTANT) ---------- */
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://reminder-app-frontend.vercel.app",
+      "https://reminder-app-frontend-nine.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+  })
+);
+
+/* ---------- BODY PARSER ---------- */
 app.use(express.json());
 
 /* ---------- ROUTES ---------- */
@@ -39,7 +53,3 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
-
-/* ---------- DEBUG ---------- */
-console.log("SID:", process.env.TWILIO_ACCOUNT_SID);
-console.log("MONGO:", process.env.MONGO_URI);

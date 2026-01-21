@@ -88,9 +88,7 @@ export const googleLogin = async (req, res) => {
     const { credential } = req.body;
 
     if (!credential) {
-      return res.status(400).json({
-        message: "No credential provided",
-      });
+      return res.status(400).json({ message: "No credential provided" });
     }
 
     const ticket = await client.verifyIdToken({
@@ -102,17 +100,12 @@ export const googleLogin = async (req, res) => {
     const email = payload.email.trim().toLowerCase();
     const name = payload.name || "User";
 
-    const superEmail = process.env.SUPERADMIN_EMAIL
-      ?.trim()
-      ?.toLowerCase();
+    const superEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
 
     let user = await User.findOne({ email });
 
-    /* 🔐 SUPERADMIN BOOTSTRAP (ONLY FIRST EVER LOGIN) */
     if (!user) {
-      const superadminExists = await User.exists({
-        role: "superadmin",
-      });
+      const superadminExists = await User.exists({ role: "superadmin" });
 
       if (!superadminExists && email === superEmail) {
         user = await User.create({
@@ -120,8 +113,8 @@ export const googleLogin = async (req, res) => {
           email,
           role: "superadmin",
           isActive: true,
-          googleEnabled: true, // 🔒 forced
-          password: null,      // ❌ no password
+          googleEnabled: true,
+          password: null,
         });
       } else {
         return res.status(403).json({
@@ -130,14 +123,12 @@ export const googleLogin = async (req, res) => {
       }
     }
 
-    /* ❌ ACCOUNT DISABLED */
     if (!user.isActive) {
       return res.status(403).json({
         message: "Account disabled by administrator.",
       });
     }
 
-    /* ❌ GOOGLE LOGIN NOT ALLOWED FOR NORMAL USERS */
     if (user.role !== "superadmin" && user.googleEnabled !== true) {
       return res.status(403).json({
         message: "Google login disabled for this account.",
@@ -160,7 +151,11 @@ export const googleLogin = async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("GOOGLE LOGIN ERROR:", err);
-    res.status(500).json({ message: "Google login failed" });
+    console.error("GOOGLE LOGIN ERROR:", err.message);
+    res.status(401).json({
+      message: "Invalid Google token",
+      error: err.message,
+    });
   }
 };
+
