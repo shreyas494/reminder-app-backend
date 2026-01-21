@@ -8,17 +8,17 @@ const transporter = nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+
+  // 🔑 IMPORTANT FOR CLOUD
+  connectionTimeout: 10000, // 10s
+  socketTimeout: 10000,     // 10s
+  greetingTimeout: 10000,
 });
 
 /**
  * Send email safely
  */
-export const sendEmail = async ({
-  to,
-  subject,
-  text,
-  html,
-}) => {
+export const sendEmail = async ({ to, subject, text, html }) => {
   if (!to) {
     console.warn("📧 Email skipped: no recipient");
     return;
@@ -34,17 +34,15 @@ export const sendEmail = async ({
     to,
     subject,
     text: text || "Reminder notification",
-    html:
-      html ||
-      `<pre style="font-family: Arial">${text}</pre>`,
+    html: html || `<pre style="font-family: Arial">${text}</pre>`,
   };
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log("📧 Email sent to:", to, "ID:", info.messageId);
+    console.log("📧 Email sent to:", to);
     return info;
   } catch (err) {
-    console.error("❌ Email send failed:", err.message);
-    throw err;
+    console.warn("📧 Email skipped (SMTP issue):", err.message);
+    return null; // 🔥 DO NOT THROW
   }
 };
