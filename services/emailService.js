@@ -1,23 +1,7 @@
-import nodemailer from "nodemailer";
+import { Resend } from "resend";
 
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: Number(process.env.EMAIL_PORT),
-  secure: false, // true only for 465
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-  // 🔑 IMPORTANT FOR CLOUD
-  connectionTimeout: 10000, // 10s
-  socketTimeout: 10000,     // 10s
-  greetingTimeout: 10000,
-});
-
-/**
- * Send email safely
- */
 export const sendEmail = async ({ to, subject, text, html }) => {
   if (!to) {
     console.warn("📧 Email skipped: no recipient");
@@ -29,20 +13,21 @@ export const sendEmail = async ({ to, subject, text, html }) => {
     return;
   }
 
-  const mailOptions = {
-    from: `"Reminder App" <${process.env.EMAIL_USER}>`,
-    to,
-    subject,
-    text: text || "Reminder notification",
-    html: html || `<pre style="font-family: Arial">${text}</pre>`,
-  };
-
   try {
-    const info = await transporter.sendMail(mailOptions);
-    console.log("📧 Email sent to:", to);
-    return info;
+    const response = await resend.emails.send({
+      from: `Reminder App <${process.env.EMAIL_FROM}>`,
+      to,
+      subject,
+      text,
+      html:
+        html ||
+        `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`,
+    });
+
+    console.log("📧 Email sent:", response.id);
+    return response;
   } catch (err) {
-    console.warn("📧 Email skipped (SMTP issue):", err.message);
-    return null; // 🔥 DO NOT THROW
+    console.error("❌ Email failed:", err.message);
+    return null; // DO NOT crash cron
   }
 };
