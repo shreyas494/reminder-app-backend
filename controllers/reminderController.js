@@ -41,9 +41,15 @@ export const createReminder = async (req, res) => {
         .json({ message: "Expiry must be after activation" });
     }
 
-    const recurringStartAt = recurringEnabled
-      ? calculateRecurringStartAt(expiry)
-      : null;
+    /* =====================================================
+       🔑 CORE FIX — reminderAt MUST NEVER BE NULL
+       ===================================================== */
+
+    const reminderAt = recurringEnabled
+      ? calculateRecurringStartAt(expiry) // 🔁 recurring
+      : expiry;                            // 🔔 one-time
+
+    /* ===================================================== */
 
     const reminder = await Reminder.create({
       user: req.user.id,
@@ -60,9 +66,8 @@ export const createReminder = async (req, res) => {
 
       recurringEnabled: !!recurringEnabled,
       recurringInterval: recurringEnabled ? recurringInterval : undefined,
-      recurringStartAt,
 
-      reminderAt: recurringStartAt,
+      reminderAt, // ✅ ALWAYS A DATE
       status: "active",
       renewed: false,
       notificationSent: false,
@@ -129,11 +134,16 @@ export const updateReminder = async (req, res) => {
 
     reminder.expiryDate = newExpiry;
 
-    reminder.recurringStartAt = reminder.recurringEnabled
-      ? calculateRecurringStartAt(newExpiry)
-      : null;
+    /* =====================================================
+       🔑 SAME FIX APPLIED ON UPDATE
+       ===================================================== */
 
-    reminder.reminderAt = reminder.recurringStartAt;
+    reminder.reminderAt = reminder.recurringEnabled
+      ? calculateRecurringStartAt(newExpiry)
+      : newExpiry;
+
+    /* ===================================================== */
+
     reminder.notificationSent = false;
     reminder.renewed = true;
   }
