@@ -14,6 +14,12 @@ export const loginUser = async (req, res) => {
     const rawEmail = req.body.email;
     const password = req.body.password;
 
+    console.log("=== LOGIN DEBUG ===");
+console.log("EMAIL FROM BODY:", req.body.email);
+console.log("PASSWORD FROM BODY:", JSON.stringify(req.body.password));
+console.log("PASSWORD LENGTH:", req.body.password?.length);
+
+
     if (!rawEmail || !password) {
       return res.status(400).json({
         message: "Email and password are required",
