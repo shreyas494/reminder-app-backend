@@ -19,11 +19,11 @@ async function runReminderCron() {
        FETCH DUE REMINDERS
        ===================================================== */
     const reminders = await Reminder.find({
-      status: "active", // ✅ DO NOT process expired reminders
+      status: "active",
       reminderAt: { $gte: windowStart, $lte: now },
       $or: [
-        { recurringEnabled: true },        // recurring reminders
-        { notificationSent: false },       // one-time reminders
+        { recurringEnabled: true },
+        { notificationSent: false },
       ],
     });
 
@@ -33,6 +33,14 @@ async function runReminderCron() {
        PROCESS EACH REMINDER
        ===================================================== */
     for (const r of reminders) {
+
+      /* ✅ IST DISPLAY (DISPLAY ONLY) */
+      const expiryIST = new Date(r.expiryDate).toLocaleString("en-IN", {
+        timeZone: "Asia/Kolkata",
+        dateStyle: "medium",
+        timeStyle: "short",
+      });
+
       /* ---------------- MESSAGE ---------------- */
       const message = `
 📢 Subscription Reminder
@@ -40,7 +48,7 @@ async function runReminderCron() {
 Client: ${r.clientName}
 Project: ${r.projectName}
 Domain: ${r.domainName || "-"}
-Expiry: ${r.expiryDate.toLocaleString()}
+Expiry: ${expiryIST}
 Amount: ₹${r.amount ?? "-"}
 
 Please renew on time.
@@ -71,14 +79,11 @@ Please renew on time.
       }
 
       /* =====================================================
-         POST-SEND LOGIC
+         POST-SEND LOGIC (UNCHANGED)
          ===================================================== */
 
       if (r.recurringEnabled) {
-        /* 🔁 RECURRING REMINDER */
-
         if (now >= r.expiryDate) {
-          // 🛑 STOP recurring after expiry
           r.recurringEnabled = false;
           r.notificationSent = true;
           r.reminderAt = null;
@@ -86,7 +91,6 @@ Please renew on time.
 
           console.log("🛑 Recurring stopped (expired):", r._id);
         } else {
-          // 🔄 Schedule next recurring reminder
           r.reminderAt = calculateNextReminderAt(
             r.reminderAt,
             r.recurringInterval
@@ -98,12 +102,9 @@ Please renew on time.
           );
         }
       } else {
-        /* 🔔 ONE-TIME REMINDER */
-
         r.notificationSent = true;
         r.reminderAt = null;
 
-        // Auto-expire if expiry crossed
         if (now >= r.expiryDate) {
           r.status = "expired";
         }
