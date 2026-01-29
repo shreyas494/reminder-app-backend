@@ -22,14 +22,15 @@ const reminderSchema = new mongoose.Schema(
 
     /* ================= DATES ================= */
     activationDate: { type: Date, required: true },
+
+    // 🔑 SINGLE SOURCE OF TRUTH (LATEST ACTIVE EXPIRY)
     expiryDate: { type: Date, required: true },
 
     /* ================= BILLING ================= */
     amount: { type: Number },
 
     /* ================= REMINDER ENGINE ================= */
-    reminderAt: { type: Date }, // ❗ NOT required (becomes null after firing)
-
+    reminderAt: { type: Date },
     notificationSent: {
       type: Boolean,
       default: false,
@@ -40,21 +41,19 @@ const reminderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
-
     recurringInterval: {
       type: String,
       enum: ["daily", "weekly"],
     },
 
-    /* ================= RENEWAL ================= */
-    renewed: {
-      type: Boolean,
-      default: false,
-    },
-
-    renewedExpiryDate: {
-      type: Date,
-    },
+    /* ================= RENEWALS (HISTORY) ================= */
+    renewals: [
+      {
+        previousExpiryDate: { type: Date, required: true },
+        newExpiryDate: { type: Date, required: true },
+        renewedAt: { type: Date, default: Date.now },
+      }
+    ],
 
     /* ================= STATUS ================= */
     status: {

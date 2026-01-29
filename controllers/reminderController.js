@@ -80,10 +80,12 @@ export const createReminder = async (req, res) => {
   }
 };
 
+
 /* =====================================================
-   READ REMINDERS (AUTO-EXPIRE)
+   READ REMINDERS (AUTO-EXPIRE + SAFE UI DATA)
    ===================================================== */
 export const getReminders = async (req, res) => {
+  // ✅ Keep existing auto-expire logic (UNCHANGED)
   await Reminder.updateMany(
     { expiryDate: { $lt: new Date() }, status: "active" },
     { $set: { status: "expired" } }
@@ -93,8 +95,22 @@ export const getReminders = async (req, res) => {
     user: req.user.id,
   }).sort({ expiryDate: 1 });
 
-  res.json(reminders);
+  // 🔑 ADDITION: UI-safe derived field
+  const enrichedReminders = reminders.map((r) => {
+    const effectiveExpiryDate =
+      r.renewed && r.renewedExpiryDate
+        ? r.renewedExpiryDate
+        : r.expiryDate;
+
+    return {
+      ...r.toObject(),
+      effectiveExpiryDate, // ✅ NEW (does not affect anything else)
+    };
+  });
+
+  res.json(enrichedReminders);
 };
+
 
 /* =====================================================
    UPDATE / RENEW REMINDER
@@ -109,48 +125,48 @@ export const updateReminder = async (req, res) => {
     return res.status(404).json({ message: "Reminder not found" });
   }
 
-  /* ❌ HARD BLOCK expired reminders */
   if (reminder.status === "expired") {
     return res
       .status(403)
       .json({ message: "Expired reminders cannot be edited" });
   }
 
-  const now = new Date();
-  const oldExpiry = reminder.expiryDate;
-
+  /* ===============================
+     🔑 ALWAYS ALLOW EXPIRY UPDATE
+     =============================== */
   if (req.body.expiryDate) {
     const newExpiry = new Date(req.body.expiryDate);
 
     if (newExpiry <= reminder.activationDate) {
-      return res
-        .status(400)
-        .json({ message: "Invalid expiry date" });
+      return res.status(400).json({
+        message: "Expiry must be after activation date",
+      });
     }
 
-    /* 🔁 BUSINESS RULE (NO DAY LOSS) */
-    reminder.activationDate =
-      now <= oldExpiry ? oldExpiry : now;
-
+    // 🔑 SINGLE SOURCE OF TRUTH
     reminder.expiryDate = newExpiry;
 
-    /* =====================================================
-       🔑 SAME FIX APPLIED ON UPDATE
-       ===================================================== */
+    // optional history
+    reminder.renewals.push({
+      previousExpiryDate: reminder.expiryDate,
+      newExpiryDate: newExpiry,
+    });
+
+    reminder.notificationSent = false;
 
     reminder.reminderAt = reminder.recurringEnabled
       ? calculateRecurringStartAt(newExpiry)
       : newExpiry;
 
-    /* ===================================================== */
-
-    reminder.notificationSent = false;
-    reminder.renewed = true;
+    reminder.status = "active";
   }
 
   await reminder.save();
   res.json(reminder);
 };
+
+
+
 
 /* =====================================================
    DELETE REMINDER
