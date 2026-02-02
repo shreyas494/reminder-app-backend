@@ -16,9 +16,14 @@ import "./cron/reminderCron.js";
 
 const app = express();
 
-/* =========================
-   ✅ CORS — FINAL & CORRECT
-   ========================= */
+/* 🔑 FIX LOGIN / POSTMESSAGE ISSUE */
+app.use((req, res, next) => {
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
+  next();
+});
+
+/* ---------- CORS ---------- */
 app.use(
   cors({
     origin: [
@@ -32,8 +37,7 @@ app.use(
   })
 );
 
-/* ❌ DO NOT add app.options("*") */
-/* cors() already handles preflight */
+app.options("*", cors());
 
 /* ---------- BODY PARSER ---------- */
 app.use(express.json());
