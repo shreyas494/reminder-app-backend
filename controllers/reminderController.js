@@ -63,7 +63,6 @@ export const createReminder = async (req, res) => {
 
       reminderAt,
       status: "active",
-      renewed: false,
       notificationSent: false,
     });
 
@@ -75,29 +74,39 @@ export const createReminder = async (req, res) => {
 };
 
 /* =====================================================
-   READ REMINDERS (✅ FIXED SORT ONLY)
+   READ REMINDERS (PAGINATED + SORTED)
    ===================================================== */
 export const getReminders = async (req, res) => {
-  // ✅ auto-expire (unchanged)
+  // auto-expire (UNCHANGED)
   await Reminder.updateMany(
     { expiryDate: { $lt: new Date() }, status: "active" },
     { $set: { status: "expired" } }
   );
 
-  // ❌ DO NOT SORT IN MONGO
+  const page = Number(req.query.page) || 1;
+  const limit = 5;
+  const skip = (page - 1) * limit;
+
   const reminders = await Reminder.find({
     user: req.user.id,
   });
 
-  // ✅ SORT BY FINAL EXPIRY (WORKS AFTER RENEW)
-  const sortedReminders = reminders
+  // ✅ SORT BY FINAL EXPIRY (MOST DUE FIRST)
+  const sorted = reminders
     .map((r) => r.toObject())
-    .sort(
-      (a, b) =>
-        new Date(a.expiryDate) - new Date(b.expiryDate)
-    );
+    .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
 
-  res.json(sortedReminders);
+  const total = sorted.length;
+  const totalPages = Math.ceil(total / limit);
+
+  const paginated = sorted.slice(skip, skip + limit);
+
+  res.json({
+    data: paginated,
+    page,
+    totalPages,
+    total,
+  });
 };
 
 /* =====================================================
@@ -119,9 +128,7 @@ export const updateReminder = async (req, res) => {
       .json({ message: "Expired reminders cannot be edited" });
   }
 
-  /* ===============================
-     🔁 RENEW — ONLY if expiryDate EXISTS
-     =============================== */
+  // 🔁 RENEW (ONLY IF expiryDate EXISTS)
   if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
     const newExpiry = new Date(req.body.expiryDate);
 
@@ -145,10 +152,7 @@ export const updateReminder = async (req, res) => {
 
     reminder.status = "active";
   }
-
-  /* ===============================
-     ✏️ EDIT DETAILS ONLY
-     =============================== */
+  // ✏️ EDIT DETAILS ONLY
   else {
     const {
       clientName,
