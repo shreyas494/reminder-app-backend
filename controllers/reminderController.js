@@ -63,6 +63,7 @@ export const createReminder = async (req, res) => {
 
       reminderAt,
       status: "active",
+      renewed: false,
       notificationSent: false,
     });
 
@@ -74,7 +75,7 @@ export const createReminder = async (req, res) => {
 };
 
 /* =====================================================
-   READ REMINDERS (PAGINATED + SORTED)
+   READ REMINDERS (✅ FIXED SORT ONLY)
    ===================================================== */
 export const getReminders = async (req, res) => {
   // auto-expire (UNCHANGED)
@@ -109,6 +110,7 @@ export const getReminders = async (req, res) => {
   });
 };
 
+
 /* =====================================================
    UPDATE / RENEW REMINDER (UNCHANGED)
    ===================================================== */
@@ -128,7 +130,9 @@ export const updateReminder = async (req, res) => {
       .json({ message: "Expired reminders cannot be edited" });
   }
 
-  // 🔁 RENEW (ONLY IF expiryDate EXISTS)
+  /* ===============================
+     🔁 RENEW — ONLY if expiryDate EXISTS
+     =============================== */
   if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
     const newExpiry = new Date(req.body.expiryDate);
 
@@ -152,7 +156,10 @@ export const updateReminder = async (req, res) => {
 
     reminder.status = "active";
   }
-  // ✏️ EDIT DETAILS ONLY
+
+  /* ===============================
+     ✏️ EDIT DETAILS ONLY
+     =============================== */
   else {
     const {
       clientName,
