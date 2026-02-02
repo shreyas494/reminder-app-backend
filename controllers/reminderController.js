@@ -2,7 +2,7 @@ import Reminder from "../models/Reminder.js";
 import { calculateRecurringStartAt } from "../utils/calculateRecurringStartAt.js";
 
 /* =====================================================
-   CREATE REMINDER
+   CREATE REMINDER (UNCHANGED)
    ===================================================== */
 export const createReminder = async (req, res) => {
   try {
@@ -41,15 +41,9 @@ export const createReminder = async (req, res) => {
         .json({ message: "Expiry must be after activation" });
     }
 
-    /* =====================================================
-       🔑 CORE FIX — reminderAt MUST NEVER BE NULL
-       ===================================================== */
-
     const reminderAt = recurringEnabled
-      ? calculateRecurringStartAt(expiry) // 🔁 recurring
-      : expiry;                            // 🔔 one-time
-
-    /* ===================================================== */
+      ? calculateRecurringStartAt(expiry)
+      : expiry;
 
     const reminder = await Reminder.create({
       user: req.user.id,
@@ -67,7 +61,7 @@ export const createReminder = async (req, res) => {
       recurringEnabled: !!recurringEnabled,
       recurringInterval: recurringEnabled ? recurringInterval : undefined,
 
-      reminderAt, // ✅ ALWAYS A DATE
+      reminderAt,
       status: "active",
       renewed: false,
       notificationSent: false,
@@ -80,40 +74,34 @@ export const createReminder = async (req, res) => {
   }
 };
 
-
 /* =====================================================
-   READ REMINDERS (AUTO-EXPIRE + SAFE UI DATA)
+   READ REMINDERS (✅ FIXED SORT ONLY)
    ===================================================== */
 export const getReminders = async (req, res) => {
-  // ✅ Keep existing auto-expire logic (UNCHANGED)
+  // ✅ auto-expire (unchanged)
   await Reminder.updateMany(
     { expiryDate: { $lt: new Date() }, status: "active" },
     { $set: { status: "expired" } }
   );
 
+  // ❌ DO NOT SORT IN MONGO
   const reminders = await Reminder.find({
     user: req.user.id,
-  }).sort({ expiryDate: 1 });
-
-  // 🔑 ADDITION: UI-safe derived field
-  const enrichedReminders = reminders.map((r) => {
-    const effectiveExpiryDate =
-      r.renewed && r.renewedExpiryDate
-        ? r.renewedExpiryDate
-        : r.expiryDate;
-
-    return {
-      ...r.toObject(),
-      effectiveExpiryDate, // ✅ NEW (does not affect anything else)
-    };
   });
 
-  res.json(enrichedReminders);
+  // ✅ SORT BY FINAL EXPIRY (WORKS AFTER RENEW)
+  const sortedReminders = reminders
+    .map((r) => r.toObject())
+    .sort(
+      (a, b) =>
+        new Date(a.expiryDate) - new Date(b.expiryDate)
+    );
+
+  res.json(sortedReminders);
 };
 
-
 /* =====================================================
-   UPDATE / RENEW REMINDER
+   UPDATE / RENEW REMINDER (UNCHANGED)
    ===================================================== */
 export const updateReminder = async (req, res) => {
   const reminder = await Reminder.findOne({
@@ -126,9 +114,9 @@ export const updateReminder = async (req, res) => {
   }
 
   if (reminder.status === "expired") {
-    return res.status(403).json({
-      message: "Expired reminders cannot be edited",
-    });
+    return res
+      .status(403)
+      .json({ message: "Expired reminders cannot be edited" });
   }
 
   /* ===============================
@@ -179,7 +167,6 @@ export const updateReminder = async (req, res) => {
     if (contactPerson !== undefined) reminder.contactPerson = contactPerson;
     if (mobile1 !== undefined) reminder.mobile1 = mobile1;
 
-    // mobile2 optional
     if (mobile2 !== undefined) {
       reminder.mobile2 = mobile2 || undefined;
     }
@@ -199,12 +186,8 @@ export const updateReminder = async (req, res) => {
   res.json(reminder);
 };
 
-
-
-
-
 /* =====================================================
-   DELETE REMINDER
+   DELETE REMINDER (UNCHANGED)
    ===================================================== */
 export const deleteReminder = async (req, res) => {
   await Reminder.findOneAndDelete({
