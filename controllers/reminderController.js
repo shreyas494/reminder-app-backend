@@ -126,15 +126,15 @@ export const updateReminder = async (req, res) => {
   }
 
   if (reminder.status === "expired") {
-    return res
-      .status(403)
-      .json({ message: "Expired reminders cannot be edited" });
+    return res.status(403).json({
+      message: "Expired reminders cannot be edited",
+    });
   }
 
   /* ===============================
-     🔑 ALWAYS ALLOW EXPIRY UPDATE
+     🔁 RENEW — ONLY if expiryDate EXISTS
      =============================== */
-  if (req.body.expiryDate) {
+  if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
     const newExpiry = new Date(req.body.expiryDate);
 
     if (newExpiry <= reminder.activationDate) {
@@ -143,15 +143,12 @@ export const updateReminder = async (req, res) => {
       });
     }
 
-    // 🔑 SINGLE SOURCE OF TRUTH
-    reminder.expiryDate = newExpiry;
-
-    // optional history
     reminder.renewals.push({
       previousExpiryDate: reminder.expiryDate,
       newExpiryDate: newExpiry,
     });
 
+    reminder.expiryDate = newExpiry;
     reminder.notificationSent = false;
 
     reminder.reminderAt = reminder.recurringEnabled
@@ -161,9 +158,47 @@ export const updateReminder = async (req, res) => {
     reminder.status = "active";
   }
 
+  /* ===============================
+     ✏️ EDIT DETAILS ONLY
+     =============================== */
+  else {
+    const {
+      clientName,
+      contactPerson,
+      mobile1,
+      mobile2,
+      email,
+      projectName,
+      domainName,
+      amount,
+      recurringEnabled,
+      recurringInterval,
+    } = req.body;
+
+    if (clientName !== undefined) reminder.clientName = clientName;
+    if (contactPerson !== undefined) reminder.contactPerson = contactPerson;
+    if (mobile1 !== undefined) reminder.mobile1 = mobile1;
+
+    // mobile2 optional
+    if (mobile2 !== undefined) {
+      reminder.mobile2 = mobile2 || undefined;
+    }
+
+    if (email !== undefined) reminder.email = email;
+    if (projectName !== undefined) reminder.projectName = projectName;
+    if (domainName !== undefined) reminder.domainName = domainName;
+    if (amount !== undefined) reminder.amount = amount;
+
+    reminder.recurringEnabled = !!recurringEnabled;
+    reminder.recurringInterval = recurringEnabled
+      ? recurringInterval
+      : undefined;
+  }
+
   await reminder.save();
   res.json(reminder);
 };
+
 
 
 

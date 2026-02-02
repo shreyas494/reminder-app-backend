@@ -1,5 +1,5 @@
 import dotenv from "dotenv";
-dotenv.config(); // MUST BE FIRST
+dotenv.config();
 
 import express from "express";
 import mongoose from "mongoose";
@@ -16,7 +16,9 @@ import "./cron/reminderCron.js";
 
 const app = express();
 
-/* ---------- CORS (IMPORTANT) ---------- */
+/* =========================
+   ✅ CORS — FINAL & CORRECT
+   ========================= */
 app.use(
   cors({
     origin: [
@@ -24,11 +26,14 @@ app.use(
       "https://reminder-app-frontend.vercel.app",
       "https://reminder-app-frontend-nine.vercel.app",
     ],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
+
+/* ❌ DO NOT add app.options("*") */
+/* cors() already handles preflight */
 
 /* ---------- BODY PARSER ---------- */
 app.use(express.json());

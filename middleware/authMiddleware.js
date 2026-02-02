@@ -1,6 +1,11 @@
 import jwt from "jsonwebtoken";
 
 export default function authMiddleware(req, res, next) {
+  // ✅ NEVER block preflight
+  if (req.method === "OPTIONS") {
+    return next();
+  }
+
   const header = req.headers.authorization;
 
   if (!header || !header.startsWith("Bearer ")) {
