@@ -136,9 +136,21 @@ export const updateReminder = async (req, res) => {
   if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
     const newExpiry = new Date(req.body.expiryDate);
 
+    if (Number.isNaN(newExpiry.getTime())) {
+      return res.status(400).json({
+        message: "Invalid expiry date",
+      });
+    }
+
     if (newExpiry <= reminder.activationDate) {
       return res.status(400).json({
         message: "Expiry must be after activation date",
+      });
+    }
+
+    if (newExpiry <= reminder.expiryDate) {
+      return res.status(400).json({
+        message: "Renewed expiry must be later than current expiry date",
       });
     }
 
