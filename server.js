@@ -42,6 +42,11 @@ app.options("*", cors());
 /* ---------- BODY PARSER ---------- */
 app.use(express.json());
 
+/* ---------- HEALTH (keep-alive ping) ---------- */
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", uptime: process.uptime() });
+});
+
 /* ---------- ROUTES ---------- */
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
