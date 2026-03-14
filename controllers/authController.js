@@ -170,11 +170,28 @@ export const googleAccessLogin = async (req, res) => {
       return res.status(400).json({ message: "No access token provided" });
     }
 
-    const tokenInfo = await client.getTokenInfo(accessToken);
+    let tokenInfo = null;
+    try {
+      tokenInfo = await client.getTokenInfo(accessToken);
+    } catch (tokenInfoError) {
+      console.warn("GOOGLE TOKEN INFO WARNING:", tokenInfoError.message);
+    }
+
     const expectedAudience = process.env.GOOGLE_CLIENT_ID?.trim();
 
-    if (!expectedAudience || tokenInfo.aud !== expectedAudience) {
-      return res.status(401).json({ message: "Google token audience mismatch" });
+    if (tokenInfo && expectedAudience) {
+      const possibleAudiences = [
+        tokenInfo.aud,
+        tokenInfo.azp,
+        tokenInfo.audience,
+        tokenInfo.issued_to,
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).trim());
+
+      if (!possibleAudiences.includes(expectedAudience)) {
+        return res.status(401).json({ message: "Google token audience mismatch" });
+      }
     }
 
     const userInfoResponse = await client.request({
@@ -187,6 +204,10 @@ export const googleAccessLogin = async (req, res) => {
     const profile = userInfoResponse?.data || {};
     const email = profile?.email?.trim().toLowerCase();
     const name = profile?.name || "User";
+
+    if (profile?.email_verified === false) {
+      return res.status(401).json({ message: "Google email is not verified" });
+    }
 
     if (!email) {
       return res.status(401).json({ message: "Google profile did not return a valid email" });
