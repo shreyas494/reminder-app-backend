@@ -179,17 +179,21 @@ export const googleAccessLogin = async (req, res) => {
 
     const expectedAudience = process.env.GOOGLE_CLIENT_ID?.trim();
 
-    if (tokenInfo && expectedAudience) {
-      const possibleAudiences = [
+    if (!expectedAudience) {
+      return res.status(500).json({ message: "Google client ID not configured" });
+    }
+
+    if (tokenInfo) {
+      const candidateAudiences = [
         tokenInfo.aud,
         tokenInfo.azp,
         tokenInfo.audience,
         tokenInfo.issued_to,
       ]
-        .filter(Boolean)
-        .map((value) => String(value).trim());
+        .flatMap((value) => (Array.isArray(value) ? value : [value]))
+        .filter(Boolean);
 
-      if (!possibleAudiences.includes(expectedAudience)) {
+      if (candidateAudiences.length > 0 && !candidateAudiences.includes(expectedAudience)) {
         return res.status(401).json({ message: "Google token audience mismatch" });
       }
     }
@@ -204,13 +208,14 @@ export const googleAccessLogin = async (req, res) => {
     const profile = userInfoResponse?.data || {};
     const email = profile?.email?.trim().toLowerCase();
     const name = profile?.name || "User";
-
-    if (profile?.email_verified === false) {
-      return res.status(401).json({ message: "Google email is not verified" });
-    }
+    const emailVerified = profile?.email_verified;
 
     if (!email) {
       return res.status(401).json({ message: "Google profile did not return a valid email" });
+    }
+
+    if (emailVerified === false) {
+      return res.status(401).json({ message: "Google account email is not verified" });
     }
 
     const superEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
