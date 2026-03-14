@@ -162,3 +162,102 @@ export const googleLogin = async (req, res) => {
   }
 };
 
+export const googleAccessLogin = async (req, res) => {
+  try {
+    const { accessToken } = req.body;
+
+    if (!accessToken) {
+      return res.status(400).json({ message: "No access token provided" });
+    }
+
+    const tokenInfoResponse = await fetch(
+      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    );
+
+    if (!tokenInfoResponse.ok) {
+      return res.status(401).json({ message: "Invalid Google access token" });
+    }
+
+    const tokenInfo = await tokenInfoResponse.json();
+    const expectedAudience = process.env.GOOGLE_CLIENT_ID?.trim();
+
+    if (!expectedAudience || (tokenInfo.aud !== expectedAudience && tokenInfo.azp !== expectedAudience)) {
+      return res.status(401).json({ message: "Google token audience mismatch" });
+    }
+
+    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!userInfoResponse.ok) {
+      return res.status(401).json({ message: "Unable to fetch Google profile" });
+    }
+
+    const profile = await userInfoResponse.json();
+    const email = profile?.email?.trim().toLowerCase();
+    const name = profile?.name || "User";
+
+    if (!email) {
+      return res.status(401).json({ message: "Google profile did not return a valid email" });
+    }
+
+    const superEmail = process.env.SUPERADMIN_EMAIL?.trim().toLowerCase();
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      const superadminExists = await User.exists({ role: "superadmin" });
+
+      if (!superadminExists && email === superEmail) {
+        user = await User.create({
+          name,
+          email,
+          role: "superadmin",
+          isActive: true,
+          googleEnabled: true,
+          password: null,
+        });
+      } else {
+        return res.status(403).json({
+          message: "Access denied. Contact administrator.",
+        });
+      }
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({
+        message: "Account disabled by administrator.",
+      });
+    }
+
+    if (user.role !== "superadmin" && user.googleEnabled !== true) {
+      return res.status(403).json({
+        message: "Google login disabled for this account.",
+      });
+    }
+
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
+    });
+  } catch (err) {
+    console.error("GOOGLE ACCESS LOGIN ERROR:", err.message);
+    return res.status(401).json({
+      message: "Invalid Google token",
+      error: err.message,
+    });
+  }
+};
+
