@@ -170,32 +170,21 @@ export const googleAccessLogin = async (req, res) => {
       return res.status(400).json({ message: "No access token provided" });
     }
 
-    const tokenInfoResponse = await fetch(
-      `https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
-    );
-
-    if (!tokenInfoResponse.ok) {
-      return res.status(401).json({ message: "Invalid Google access token" });
-    }
-
-    const tokenInfo = await tokenInfoResponse.json();
+    const tokenInfo = await client.getTokenInfo(accessToken);
     const expectedAudience = process.env.GOOGLE_CLIENT_ID?.trim();
 
-    if (!expectedAudience || (tokenInfo.aud !== expectedAudience && tokenInfo.azp !== expectedAudience)) {
+    if (!expectedAudience || tokenInfo.aud !== expectedAudience) {
       return res.status(401).json({ message: "Google token audience mismatch" });
     }
 
-    const userInfoResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    const userInfoResponse = await client.request({
+      url: "https://www.googleapis.com/oauth2/v3/userinfo",
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
     });
 
-    if (!userInfoResponse.ok) {
-      return res.status(401).json({ message: "Unable to fetch Google profile" });
-    }
-
-    const profile = await userInfoResponse.json();
+    const profile = userInfoResponse?.data || {};
     const email = profile?.email?.trim().toLowerCase();
     const name = profile?.name || "User";
 
