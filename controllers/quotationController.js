@@ -5,6 +5,7 @@ import {
   buildQuotationPreviewHtml,
   buildQuotationEmailPayload,
 } from "../services/quotationDocumentService.js";
+import { buildQuotationPdfBuffer } from "../services/quotationPdfService.js";
 
 function generateQuotationNumber() {
   const prefix = process.env.QUOTATION_PREFIX || "QTN";
@@ -253,11 +254,19 @@ export const sendQuotation = async (req, res) => {
     }
 
     const payload = buildQuotationEmailPayload(quotation);
+    const pdfBuffer = await buildQuotationPdfBuffer(quotation);
+
     const sent = await sendEmail({
       to: quotation.clientEmail,
       subject: payload.subject,
       text: payload.text,
       html: payload.html,
+      attachments: [
+        {
+          filename: `${quotation.quotationNumber || "quotation"}.pdf`,
+          content: pdfBuffer.toString("base64"),
+        },
+      ],
     });
 
     if (!sent?.id) {

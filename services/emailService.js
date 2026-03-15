@@ -6,7 +6,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const MIN_EMAIL_INTERVAL_MS = 600;
 let nextEmailAllowedAt = 0;
 
-export const sendEmail = async ({ to, subject, text, html }) => {
+export const sendEmail = async ({ to, subject, text, html, attachments = [] }) => {
   if (!to) {
     console.warn("📧 Email skipped: no recipient");
     return;
@@ -33,6 +33,7 @@ export const sendEmail = async ({ to, subject, text, html }) => {
       html:
         html ||
         `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`,
+      attachments,
     };
 
     const maxAttempts = 3;
