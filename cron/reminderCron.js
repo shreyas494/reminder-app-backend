@@ -62,9 +62,15 @@ async function runReminderCron() {
         });
 
         if (sent) {
-          reminder.quotationSent = true;
-          reminder.quotationSentAt = new Date();
-          await reminder.save();
+          await Reminder.updateOne(
+            { _id: reminder._id },
+            {
+              $set: {
+                quotationSent: true,
+                quotationSentAt: new Date(),
+              },
+            }
+          );
           console.log(`[CRON][QUOTATION] Sent ${reminder._id}`);
         }
       } catch (quoteErr) {
@@ -145,30 +151,38 @@ Please renew on time.
         }
       }
 
+      const updateFields = {};
+
       if (r.recurringEnabled) {
         if (now >= r.expiryDate) {
-          r.recurringEnabled = false;
-          r.notificationSent = true;
-          r.reminderAt = null;
-          r.status = "expired";
+          updateFields.recurringEnabled = false;
+          updateFields.notificationSent = true;
+          updateFields.reminderAt = null;
+          updateFields.status = "expired";
 
           console.log("[CRON][REMINDER] Recurring stopped (expired):", r._id);
         } else {
-          r.reminderAt = calculateNextReminderAt(r.reminderAt, r.recurringInterval);
-          console.log("[CRON][REMINDER] Next reminder scheduled:", r.reminderAt.toISOString());
+          const nextReminderAt = calculateNextReminderAt(r.reminderAt, r.recurringInterval);
+          updateFields.reminderAt = nextReminderAt;
+          console.log("[CRON][REMINDER] Next reminder scheduled:", nextReminderAt.toISOString());
         }
       } else {
-        r.notificationSent = true;
-        r.reminderAt = null;
+        updateFields.notificationSent = true;
+        updateFields.reminderAt = null;
 
         if (now >= r.expiryDate) {
-          r.status = "expired";
+          updateFields.status = "expired";
         }
 
         console.log("[CRON][REMINDER] One-time reminder marked sent:", r._id);
       }
 
-      await r.save();
+      await Reminder.updateOne(
+        { _id: r._id },
+        {
+          $set: updateFields,
+        }
+      );
       console.log(`[CRON][REMINDER] Saved ${r._id}`);
     }
   } catch (err) {
