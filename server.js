@@ -45,7 +45,7 @@ app.use(
 app.options("*", cors());
 
 /* ---------- BODY PARSER ---------- */
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 app.use("/assets", express.static(path.join(__dirname, "public")));
 
 /* ---------- HEALTH (keep-alive ping) ---------- */

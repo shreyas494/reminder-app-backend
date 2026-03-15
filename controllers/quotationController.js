@@ -252,7 +252,17 @@ export const sendQuotation = async (req, res) => {
       return res.status(400).json({ message: "Client email is required" });
     }
 
-    const pdfBuffer = await buildQuotationPdfBuffer(quotation);
+    const incomingPdfBase64 = typeof req.body?.pdfBase64 === "string" ? req.body.pdfBase64 : "";
+
+    let pdfBuffer;
+    if (incomingPdfBase64) {
+      const normalizedBase64 = incomingPdfBase64.includes(",")
+        ? incomingPdfBase64.split(",").pop()
+        : incomingPdfBase64;
+      pdfBuffer = Buffer.from(normalizedBase64, "base64");
+    } else {
+      pdfBuffer = await buildQuotationPdfBuffer(quotation);
+    }
 
     const sent = await sendEmail({
       to: quotation.clientEmail,
