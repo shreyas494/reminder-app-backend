@@ -3,6 +3,7 @@ import Reminder from "../models/Reminder.js";
 import { calculateNextReminderAt } from "../utils/calculateNextReminderAt.js";
 import { sendWhatsAppMessage } from "../services/twilioService.js";
 import { sendEmail } from "../services/emailService.js";
+import { buildQuotationEmail } from "../services/quotationService.js";
 
 /* =====================================================
    REMINDER CRON (ONE-TIME + RECURRING)
@@ -11,6 +12,8 @@ import { sendEmail } from "../services/emailService.js";
 async function runReminderCron() {
   try {
     const now = new Date();
+    const quotationTriggerDays = Number(process.env.QUOTATION_TRIGGER_DAYS || 3);
+    const quotationThreshold = new Date(now.getTime() + quotationTriggerDays * 24 * 60 * 60 * 1000);
 
     // 🛡 Safety window (handles cron delay)
     const windowStart = new Date(now.getTime() - 2 * 60 * 1000);
@@ -27,7 +30,38 @@ async function runReminderCron() {
       ],
     });
 
+    const quotationCandidates = await Reminder.find({
+      quotationSent: false,
+      expiryDate: { $lte: quotationThreshold },
+      email: { $exists: true, $ne: "" },
+      status: { $in: ["active", "expired"] },
+    });
+
     console.log("⏰ Cron running. Matches:", reminders.length);
+    console.log("📄 Quotation candidates:", quotationCandidates.length);
+
+    for (const reminder of quotationCandidates) {
+      try {
+        const quotationType = reminder.expiryDate <= now ? "expired" : "ending-soon";
+        const quotation = buildQuotationEmail(reminder, quotationType);
+
+        const sent = await sendEmail({
+          to: reminder.email,
+          subject: quotation.subject,
+          text: quotation.text,
+          html: quotation.html,
+        });
+
+        if (sent) {
+          reminder.quotationSent = true;
+          reminder.quotationSentAt = new Date();
+          await reminder.save();
+          console.log("📄 Quotation sent:", reminder._id.toString());
+        }
+      } catch (quoteErr) {
+        console.error("❌ Quotation send failed:", quoteErr.message);
+      }
+    }
 
     /* =====================================================
        PROCESS EACH REMINDER

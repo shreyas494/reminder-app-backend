@@ -35,6 +35,14 @@ const reminderSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    quotationSent: {
+      type: Boolean,
+      default: false,
+    },
+    quotationSentAt: {
+      type: Date,
+      default: null,
+    },
 
     /* ================= RECURRING ================= */
     recurringEnabled: {

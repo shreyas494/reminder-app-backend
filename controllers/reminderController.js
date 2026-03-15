@@ -65,6 +65,8 @@ export const createReminder = async (req, res) => {
       status: "active",
       renewed: false,
       notificationSent: false,
+      quotationSent: false,
+      quotationSentAt: null,
     });
 
     res.status(201).json(reminder);
@@ -161,6 +163,8 @@ export const updateReminder = async (req, res) => {
 
     reminder.expiryDate = newExpiry;
     reminder.notificationSent = false;
+    reminder.quotationSent = false;
+    reminder.quotationSentAt = null;
 
     reminder.reminderAt = reminder.recurringEnabled
       ? calculateRecurringStartAt(newExpiry)
