@@ -19,14 +19,18 @@ function getCompanyDefaults() {
     companyAddress:
       process.env.COMPANY_ADDRESS ||
       "C-1, Geetadham Bhakti Apartment, Bhavani Peth, Shelgi Naka, Solapur - 413002.",
-    companyRegistration: process.env.COMPANY_REGISTRATION || "",
-    companyPhone: process.env.COMPANY_PHONE || "",
+    companyRegistration:
+      process.env.COMPANY_REGISTRATION || "2131100315838724",
+    companyPhone: process.env.COMPANY_PHONE || "+91 87 88 99 88 20",
     companyTagline:
       process.env.COMPANY_TAGLINE ||
       "Software Development – Website Development – App Development – Digital Marketing",
     companyLogoUrl: process.env.COMPANY_LOGO_URL || "",
-    senderName: process.env.QUOTATION_SENDER_NAME || "",
-    senderPhone: process.env.QUOTATION_SENDER_PHONE || process.env.COMPANY_PHONE || "",
+    senderName: process.env.QUOTATION_SENDER_NAME || "Shashank Deshpande",
+    senderPhone:
+      process.env.QUOTATION_SENDER_PHONE ||
+      process.env.COMPANY_PHONE ||
+      "+91 87 88 99 88 20",
   };
 }
 
