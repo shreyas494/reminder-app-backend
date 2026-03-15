@@ -126,10 +126,18 @@ export const updateReminder = async (req, res) => {
     return res.status(404).json({ message: "Reminder not found" });
   }
 
+  const isRenewRequest = req.method === "PATCH";
+
   /* ===============================
-     🔁 RENEW — ONLY if expiryDate EXISTS
+     🔁 RENEW — PATCH /:id
      =============================== */
-  if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
+  if (isRenewRequest) {
+    if (!Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
+      return res.status(400).json({
+        message: "Expiry date is required for renew",
+      });
+    }
+
     const newExpiry = new Date(req.body.expiryDate);
 
     if (Number.isNaN(newExpiry.getTime())) {
