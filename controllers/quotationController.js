@@ -25,7 +25,9 @@ function getCompanyDefaults() {
     companyTagline:
       process.env.COMPANY_TAGLINE ||
       "Software Development – Website Development – App Development – Digital Marketing",
-    companyLogoUrl: process.env.COMPANY_LOGO_URL || "",
+    companyLogoUrl:
+      process.env.COMPANY_LOGO_URL ||
+      "https://reminder-app-frontend.vercel.app/company-logo.png",
     senderName: process.env.QUOTATION_SENDER_NAME || "Shashank Deshpande",
     senderPhone:
       process.env.QUOTATION_SENDER_PHONE ||
