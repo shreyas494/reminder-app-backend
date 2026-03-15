@@ -14,8 +14,8 @@ export function buildQuotationPreviewHtml(quotation) {
 
   return `
   <div style="max-width:800px;margin:0 auto;padding:24px;background:#fff;color:#111827;font-family:Arial,sans-serif;line-height:1.5;">
-    <div style="position:relative;padding-left:104px;min-height:88px;">
-      ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="position:absolute;left:0;top:0;width:88px;height:88px;object-fit:contain;"/>` : ""}
+    <div style="position:relative;padding-left:130px;min-height:90px;">
+      ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="position:absolute;left:6px;top:2px;width:74px;height:74px;object-fit:contain;"/>` : ""}
       <div style="text-align:center;">
         <h1 style="margin:0;font-size:34px;font-weight:700;">${quotation.companyName}</h1>
         <div style="font-size:14px;font-weight:600;">${quotation.companyAddress}</div>
