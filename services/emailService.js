@@ -41,6 +41,9 @@ export const sendEmail = async ({ to, subject, text, html, attachments = [] }) =
       payload.html = html;
     } else if (text) {
       payload.html = `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`;
+    } else if (hasAttachments) {
+      payload.text = " ";
+      payload.html = "<div style=\"display:none\">&nbsp;</div>";
     }
 
     if (hasAttachments) {
