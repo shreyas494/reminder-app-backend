@@ -13,6 +13,15 @@ function generateQuotationNumber() {
   return `${prefix}-${timestamp}-${random}`;
 }
 
+const FALLBACK_LOGO_URL = "https://reminder-app-frontend.vercel.app/company-logo.png";
+
+function resolveLogoUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return FALLBACK_LOGO_URL;
+  if (raw.includes("yourdomain.com")) return FALLBACK_LOGO_URL;
+  return raw;
+}
+
 function getCompanyDefaults() {
   return {
     companyName: process.env.COMPANY_NAME || "Lemonade Software Developers",
@@ -25,9 +34,7 @@ function getCompanyDefaults() {
     companyTagline:
       process.env.COMPANY_TAGLINE ||
       "Software Development – Website Development – App Development – Digital Marketing",
-    companyLogoUrl:
-      process.env.COMPANY_LOGO_URL ||
-      "https://reminder-app-frontend.vercel.app/company-logo.png",
+    companyLogoUrl: resolveLogoUrl(process.env.COMPANY_LOGO_URL),
     senderName: process.env.QUOTATION_SENDER_NAME || "Shashank Deshpande",
     senderPhone:
       process.env.QUOTATION_SENDER_PHONE ||
@@ -149,9 +156,12 @@ export const getQuotationById = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
+    const quotationData = quotation.toObject();
+    quotationData.companyLogoUrl = resolveLogoUrl(quotationData.companyLogoUrl);
+
     res.json({
-      ...quotation.toObject(),
-      previewHtml: buildQuotationPreviewHtml(quotation),
+      ...quotationData,
+      previewHtml: buildQuotationPreviewHtml(quotationData),
     });
   } catch (err) {
     console.error("[QUOTATION] Get by id failed:", err?.message || err);
