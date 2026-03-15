@@ -267,6 +267,7 @@ export const sendQuotation = async (req, res) => {
     const sent = await sendEmail({
       to: quotation.clientEmail,
       subject: `${quotation.subject} - ${quotation.quotationNumber}`,
+      html: "<!doctype html><html><body><div style=\"font-size:1px;line-height:1px;color:#ffffff;\">.</div></body></html>",
       attachments: [
         {
           filename: `${quotation.quotationNumber || "quotation"}.pdf`,
