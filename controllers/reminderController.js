@@ -126,12 +126,6 @@ export const updateReminder = async (req, res) => {
     return res.status(404).json({ message: "Reminder not found" });
   }
 
-  if (reminder.status === "expired") {
-    return res
-      .status(403)
-      .json({ message: "Expired reminders cannot be edited" });
-  }
-
   /* ===============================
      🔁 RENEW — ONLY if expiryDate EXISTS
      =============================== */
@@ -177,6 +171,12 @@ export const updateReminder = async (req, res) => {
      ✏️ EDIT DETAILS ONLY
      =============================== */
   else {
+    if (reminder.status === "expired") {
+      return res
+        .status(403)
+        .json({ message: "Expired reminders cannot be edited (renew instead)" });
+    }
+
     const {
       clientName,
       contactPerson,
