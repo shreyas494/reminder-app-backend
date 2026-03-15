@@ -24,8 +24,18 @@ export const sendEmail = async ({ to, subject, text, html }) => {
         `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`,
     });
 
-    console.log("📧 Email sent:", response?.data?.id);
-    return response?.data ?? response;
+    if (response?.error) {
+      console.error("❌ Email provider error:", response.error);
+      return null;
+    }
+
+    if (!response?.data?.id) {
+      console.error("❌ Email send returned no message id:", response);
+      return null;
+    }
+
+    console.log("📧 Email sent:", response.data.id);
+    return response.data;
   } catch (err) {
     console.error("❌ Email failed:", err.message);
     return null; // DO NOT crash cron

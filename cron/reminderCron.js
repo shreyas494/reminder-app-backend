@@ -122,12 +122,17 @@ Please renew on time.
       if (r.email) {
         try {
           console.log(`[CRON][EMAIL] Sending ${r._id} -> ${r.email}`);
-          await sendEmail({
+          const emailResult = await sendEmail({
             to: r.email,
             subject: "Subscription Expiry Reminder",
             text: message,
           });
-          console.log(`[CRON][EMAIL] Sent ${r._id}`);
+
+          if (emailResult?.id) {
+            console.log(`[CRON][EMAIL] Sent ${r._id} (messageId=${emailResult.id})`);
+          } else {
+            console.error(`[CRON][EMAIL] Failed ${r._id} (no message id returned)`);
+          }
         } catch (err) {
           console.error(`[CRON][EMAIL] Failed ${r._id}:`, err?.message || err);
         }
