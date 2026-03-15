@@ -3,7 +3,6 @@ import Reminder from "../models/Reminder.js";
 import { sendEmail } from "../services/emailService.js";
 import {
   buildQuotationPreviewHtml,
-  buildQuotationEmailPayload,
 } from "../services/quotationDocumentService.js";
 import { buildQuotationPdfBuffer } from "../services/quotationPdfService.js";
 
@@ -253,14 +252,11 @@ export const sendQuotation = async (req, res) => {
       return res.status(400).json({ message: "Client email is required" });
     }
 
-    const payload = buildQuotationEmailPayload(quotation);
     const pdfBuffer = await buildQuotationPdfBuffer(quotation);
 
     const sent = await sendEmail({
       to: quotation.clientEmail,
-      subject: payload.subject,
-      text: payload.text,
-      html: payload.html,
+      subject: `${quotation.subject} - ${quotation.quotationNumber}`,
       attachments: [
         {
           filename: `${quotation.quotationNumber || "quotation"}.pdf`,

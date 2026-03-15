@@ -1,4 +1,11 @@
 import PDFDocument from "pdfkit";
+import axios from "axios";
+import fs from "fs/promises";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 function formatCurrency(value) {
   const amount = Math.round(Number(value || 0));
@@ -9,7 +16,33 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("en-GB");
 }
 
-export function buildQuotationPdfBuffer(quotation) {
+async function resolveLogoBuffer(logoUrl) {
+  const fallbackPath = path.join(__dirname, "..", "public", "company-logo.png");
+
+  if (logoUrl && String(logoUrl).startsWith("data:image/")) {
+    try {
+      const base64 = String(logoUrl).split(",")[1];
+      return Buffer.from(base64, "base64");
+    } catch {}
+  }
+
+  if (logoUrl && /^https?:\/\//i.test(String(logoUrl))) {
+    try {
+      const response = await axios.get(String(logoUrl), { responseType: "arraybuffer", timeout: 5000 });
+      return Buffer.from(response.data);
+    } catch {}
+  }
+
+  try {
+    return await fs.readFile(fallbackPath);
+  } catch {
+    return null;
+  }
+}
+
+export async function buildQuotationPdfBuffer(quotation) {
+  const logoBuffer = await resolveLogoBuffer(quotation.companyLogoUrl);
+
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: "A4", margin: 40 });
     const chunks = [];
@@ -25,31 +58,31 @@ export function buildQuotationPdfBuffer(quotation) {
 
     const companyName = quotation.companyName || "Lemonade Software Developers";
 
-    if (quotation.companyLogoUrl && quotation.companyLogoUrl.startsWith("data:image/")) {
+    if (logoBuffer) {
       try {
-        const base64 = quotation.companyLogoUrl.split(",")[1];
-        const imageBuffer = Buffer.from(base64, "base64");
-        doc.image(imageBuffer, 28, 24, { width: 78, height: 78, fit: [78, 78] });
+        doc.image(logoBuffer, 22, 22, { width: 82, height: 82, fit: [82, 82] });
       } catch {}
     }
 
-    doc.font("Helvetica-Bold").fontSize(16).text(companyName, 0, 36, { align: "center" });
-    doc.font("Helvetica").fontSize(10).text(quotation.companyAddress || "", { align: "center" });
+    doc.font("Helvetica-Bold").fontSize(16).text(companyName, 114, 34, { width: 430, align: "center" });
+    doc.font("Helvetica").fontSize(10).text(quotation.companyAddress || "", 114, 54, { width: 430, align: "center" });
 
     if (quotation.companyRegistration) {
       doc
         .fontSize(10)
         .text(
           `Registration Certificate No: ${quotation.companyRegistration}. Mobile No: ${quotation.companyPhone || ""}`,
-          { align: "center" }
+          114,
+          68,
+          { width: 430, align: "center" }
         );
     }
 
     if (quotation.companyTagline) {
-      doc.fontSize(10).text(quotation.companyTagline, { align: "center" });
+      doc.fontSize(10).text(quotation.companyTagline, 114, 82, { width: 430, align: "center" });
     }
 
-    doc.moveDown(0.3);
+    doc.y = 110;
     doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke();
 
     doc.font("Helvetica").fontSize(10).text(`Date: ${formatDate(quotation.quotationDate)}`, { align: "right" });

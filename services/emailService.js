@@ -12,7 +12,9 @@ export const sendEmail = async ({ to, subject, text, html, attachments = [] }) =
     return { error: "Email skipped: no recipient" };
   }
 
-  if (!text && !html) {
+  const hasAttachments = Array.isArray(attachments) && attachments.length > 0;
+
+  if (!text && !html && !hasAttachments) {
     console.warn("📧 Email skipped: empty message");
     return { error: "Email skipped: empty message" };
   }
@@ -29,13 +31,19 @@ export const sendEmail = async ({ to, subject, text, html, attachments = [] }) =
       from: `Reminder App <${process.env.EMAIL_FROM}>`,
       to,
       subject,
-      text,
-      html:
-        html ||
-        `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`,
     };
 
-    if (Array.isArray(attachments) && attachments.length > 0) {
+    if (text) {
+      payload.text = text;
+    }
+
+    if (html) {
+      payload.html = html;
+    } else if (text) {
+      payload.html = `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`;
+    }
+
+    if (hasAttachments) {
       payload.attachments = attachments;
     }
 
