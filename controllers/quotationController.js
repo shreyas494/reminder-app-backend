@@ -13,13 +13,13 @@ function generateQuotationNumber() {
   return `${prefix}-${timestamp}-${random}`;
 }
 
-const FALLBACK_LOGO_URL = "https://reminder-app-frontend.vercel.app/company-logo.png";
+const FALLBACK_LOGO_URL = "https://reminder-app-backend-aaac.onrender.com/assets/company-logo.png";
 
 function resolveLogoUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return FALLBACK_LOGO_URL;
   if (raw.includes("yourdomain.com")) return FALLBACK_LOGO_URL;
-  return raw;
+  return FALLBACK_LOGO_URL;
 }
 
 function getCompanyDefaults() {

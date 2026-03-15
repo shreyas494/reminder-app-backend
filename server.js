@@ -4,6 +4,8 @@ dotenv.config();
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 
 // Routes
 import authRoutes from "./routes/authRoutes.js";
@@ -16,6 +18,8 @@ import quotationRoutes from "./routes/quotationRoutes.js";
 import "./cron/reminderCron.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /* 🔑 FIX LOGIN / POSTMESSAGE ISSUE */
 app.use((req, res, next) => {
@@ -42,6 +46,7 @@ app.options("*", cors());
 
 /* ---------- BODY PARSER ---------- */
 app.use(express.json());
+app.use("/assets", express.static(path.join(__dirname, "public")));
 
 /* ---------- HEALTH (keep-alive ping) ---------- */
 app.get("/api/health", (req, res) => {
