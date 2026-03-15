@@ -38,11 +38,18 @@ async function runReminderCron() {
       status: { $in: ["active", "expired"] },
     });
 
+    const reminderIdsDueNow = new Set(reminders.map((item) => item._id.toString()));
+
     console.log("[CRON][REMINDER] Matches:", reminders.length);
     console.log("[CRON][QUOTATION] Candidates:", quotationCandidates.length);
 
     for (const reminder of quotationCandidates) {
       try {
+        if (reminderIdsDueNow.has(reminder._id.toString())) {
+          console.log(`[CRON][QUOTATION] Skipped ${reminder._id} (reminder email due in same tick)`);
+          continue;
+        }
+
         const quotationType = reminder.expiryDate <= now ? "expired" : "ending-soon";
         const quotation = buildQuotationEmail(reminder, quotationType);
 
