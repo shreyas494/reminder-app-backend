@@ -10,6 +10,7 @@ import authRoutes from "./routes/authRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import reminderRoutes from "./routes/reminderRoutes.js";
 import contactRoutes from "./routes/contacts.js";
+import quotationRoutes from "./routes/quotationRoutes.js";
 
 // Cron
 import "./cron/reminderCron.js";
@@ -52,6 +53,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/contacts", contactRoutes);
+app.use("/api/quotations", quotationRoutes);
 
 /* ---------- DB ---------- */
 mongoose

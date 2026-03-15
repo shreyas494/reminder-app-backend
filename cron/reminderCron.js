@@ -3,7 +3,6 @@ import Reminder from "../models/Reminder.js";
 import { calculateNextReminderAt } from "../utils/calculateNextReminderAt.js";
 import { sendWhatsAppMessage } from "../services/twilioService.js";
 import { sendEmail } from "../services/emailService.js";
-import { buildQuotationEmail } from "../services/quotationService.js";
 
 /* =====================================================
    REMINDER CRON (ONE-TIME + RECURRING)
@@ -12,8 +11,6 @@ import { buildQuotationEmail } from "../services/quotationService.js";
 async function runReminderCron() {
   try {
     const now = new Date();
-    const quotationTriggerDays = Number(process.env.QUOTATION_TRIGGER_DAYS || 3);
-    const quotationThreshold = new Date(now.getTime() + quotationTriggerDays * 24 * 60 * 60 * 1000);
 
     const windowStart = new Date(now.getTime() - 2 * 60 * 1000);
 
@@ -31,52 +28,8 @@ async function runReminderCron() {
       $or: [{ recurringEnabled: true }, { notificationSent: false }],
     });
 
-    const quotationCandidates = await Reminder.find({
-      quotationSent: false,
-      expiryDate: { $lte: quotationThreshold },
-      email: { $exists: true, $ne: "" },
-      status: { $in: ["active", "expired"] },
-    });
-
-    const reminderIdsDueNow = new Set(reminders.map((item) => item._id.toString()));
-
     console.log("[CRON][REMINDER] Matches:", reminders.length);
-    console.log("[CRON][QUOTATION] Candidates:", quotationCandidates.length);
-
-    for (const reminder of quotationCandidates) {
-      try {
-        if (reminderIdsDueNow.has(reminder._id.toString())) {
-          console.log(`[CRON][QUOTATION] Skipped ${reminder._id} (reminder email due in same tick)`);
-          continue;
-        }
-
-        const quotationType = reminder.expiryDate <= now ? "expired" : "ending-soon";
-        const quotation = buildQuotationEmail(reminder, quotationType);
-
-        console.log(`[CRON][QUOTATION] Sending ${reminder._id} to ${reminder.email}`);
-        const sent = await sendEmail({
-          to: reminder.email,
-          subject: quotation.subject,
-          text: quotation.text,
-          html: quotation.html,
-        });
-
-        if (sent) {
-          await Reminder.updateOne(
-            { _id: reminder._id },
-            {
-              $set: {
-                quotationSent: true,
-                quotationSentAt: new Date(),
-              },
-            }
-          );
-          console.log(`[CRON][QUOTATION] Sent ${reminder._id}`);
-        }
-      } catch (quoteErr) {
-        console.error("[CRON][QUOTATION] Failed:", quoteErr?.message || quoteErr);
-      }
-    }
+    console.log("[CRON][QUOTATION] Auto-send disabled. Use manual quotations module.");
 
     for (const r of reminders) {
       console.log(
