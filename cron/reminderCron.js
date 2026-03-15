@@ -15,19 +15,20 @@ async function runReminderCron() {
     const quotationTriggerDays = Number(process.env.QUOTATION_TRIGGER_DAYS || 3);
     const quotationThreshold = new Date(now.getTime() + quotationTriggerDays * 24 * 60 * 60 * 1000);
 
-    // 🛡 Safety window (handles cron delay)
     const windowStart = new Date(now.getTime() - 2 * 60 * 1000);
 
-    /* =====================================================
-       FETCH DUE REMINDERS
-       ===================================================== */
+    console.log(
+      "[CRON][REMINDER] Tick",
+      JSON.stringify({
+        now: now.toISOString(),
+        windowStart: windowStart.toISOString(),
+      })
+    );
+
     const reminders = await Reminder.find({
       status: "active",
       reminderAt: { $gte: windowStart, $lte: now },
-      $or: [
-        { recurringEnabled: true },
-        { notificationSent: false },
-      ],
+      $or: [{ recurringEnabled: true }, { notificationSent: false }],
     });
 
     const quotationCandidates = await Reminder.find({
@@ -37,14 +38,15 @@ async function runReminderCron() {
       status: { $in: ["active", "expired"] },
     });
 
-    console.log("⏰ Cron running. Matches:", reminders.length);
-    console.log("📄 Quotation candidates:", quotationCandidates.length);
+    console.log("[CRON][REMINDER] Matches:", reminders.length);
+    console.log("[CRON][QUOTATION] Candidates:", quotationCandidates.length);
 
     for (const reminder of quotationCandidates) {
       try {
         const quotationType = reminder.expiryDate <= now ? "expired" : "ending-soon";
         const quotation = buildQuotationEmail(reminder, quotationType);
 
+        console.log(`[CRON][QUOTATION] Sending ${reminder._id} to ${reminder.email}`);
         const sent = await sendEmail({
           to: reminder.email,
           subject: quotation.subject,
@@ -56,26 +58,35 @@ async function runReminderCron() {
           reminder.quotationSent = true;
           reminder.quotationSentAt = new Date();
           await reminder.save();
-          console.log("📄 Quotation sent:", reminder._id.toString());
+          console.log(`[CRON][QUOTATION] Sent ${reminder._id}`);
         }
       } catch (quoteErr) {
-        console.error("❌ Quotation send failed:", quoteErr.message);
+        console.error("[CRON][QUOTATION] Failed:", quoteErr?.message || quoteErr);
       }
     }
 
-    /* =====================================================
-       PROCESS EACH REMINDER
-       ===================================================== */
     for (const r of reminders) {
+      console.log(
+        "[CRON][REMINDER] Processing",
+        JSON.stringify({
+          id: r._id?.toString(),
+          clientName: r.clientName,
+          projectName: r.projectName,
+          reminderAt: r.reminderAt ? new Date(r.reminderAt).toISOString() : null,
+          expiryDate: r.expiryDate ? new Date(r.expiryDate).toISOString() : null,
+          recurringEnabled: r.recurringEnabled,
+          recurringInterval: r.recurringInterval || null,
+          notificationSent: r.notificationSent,
+          status: r.status,
+        })
+      );
 
-      /* ✅ IST DISPLAY (DISPLAY ONLY) */
       const expiryIST = new Date(r.expiryDate).toLocaleString("en-IN", {
         timeZone: "Asia/Kolkata",
         dateStyle: "medium",
         timeStyle: "short",
       });
 
-      /* ---------------- MESSAGE ---------------- */
       const message = `
 📢 Subscription Reminder
 
@@ -88,33 +99,39 @@ Amount: ₹${r.amount ?? "-"}
 Please renew on time.
 `;
 
-      /* ---------------- WHATSAPP ---------------- */
       if (r.mobile1) {
-        await sendWhatsAppMessage({
-          to: r.mobile1,
-          message,
-        });
+        try {
+          console.log(`[CRON][WHATSAPP] Sending primary ${r._id} -> ${r.mobile1}`);
+          await sendWhatsAppMessage({ to: r.mobile1, message });
+          console.log(`[CRON][WHATSAPP] Sent primary ${r._id}`);
+        } catch (err) {
+          console.error(`[CRON][WHATSAPP] Failed primary ${r._id}:`, err?.message || err);
+        }
       }
 
       if (r.mobile2) {
-        await sendWhatsAppMessage({
-          to: r.mobile2,
-          message,
-        });
+        try {
+          console.log(`[CRON][WHATSAPP] Sending secondary ${r._id} -> ${r.mobile2}`);
+          await sendWhatsAppMessage({ to: r.mobile2, message });
+          console.log(`[CRON][WHATSAPP] Sent secondary ${r._id}`);
+        } catch (err) {
+          console.error(`[CRON][WHATSAPP] Failed secondary ${r._id}:`, err?.message || err);
+        }
       }
 
-      /* ---------------- EMAIL ---------------- */
       if (r.email) {
-        await sendEmail({
-          to: r.email,
-          subject: "Subscription Expiry Reminder",
-          text: message,
-        });
+        try {
+          console.log(`[CRON][EMAIL] Sending ${r._id} -> ${r.email}`);
+          await sendEmail({
+            to: r.email,
+            subject: "Subscription Expiry Reminder",
+            text: message,
+          });
+          console.log(`[CRON][EMAIL] Sent ${r._id}`);
+        } catch (err) {
+          console.error(`[CRON][EMAIL] Failed ${r._id}:`, err?.message || err);
+        }
       }
-
-      /* =====================================================
-         POST-SEND LOGIC (UNCHANGED)
-         ===================================================== */
 
       if (r.recurringEnabled) {
         if (now >= r.expiryDate) {
@@ -123,17 +140,10 @@ Please renew on time.
           r.reminderAt = null;
           r.status = "expired";
 
-          console.log("🛑 Recurring stopped (expired):", r._id);
+          console.log("[CRON][REMINDER] Recurring stopped (expired):", r._id);
         } else {
-          r.reminderAt = calculateNextReminderAt(
-            r.reminderAt,
-            r.recurringInterval
-          );
-
-          console.log(
-            "🔁 Next reminder scheduled at:",
-            r.reminderAt.toISOString()
-          );
+          r.reminderAt = calculateNextReminderAt(r.reminderAt, r.recurringInterval);
+          console.log("[CRON][REMINDER] Next reminder scheduled:", r.reminderAt.toISOString());
         }
       } else {
         r.notificationSent = true;
@@ -143,13 +153,14 @@ Please renew on time.
           r.status = "expired";
         }
 
-        console.log("🔔 One-time reminder sent:", r._id);
+        console.log("[CRON][REMINDER] One-time reminder marked sent:", r._id);
       }
 
       await r.save();
+      console.log(`[CRON][REMINDER] Saved ${r._id}`);
     }
   } catch (err) {
-    console.error("❌ CRON ERROR:", err.message);
+    console.error("[CRON][REMINDER] Unhandled error:", err?.stack || err?.message || err);
   }
 }
 
