@@ -9,12 +9,12 @@ let nextEmailAllowedAt = 0;
 export const sendEmail = async ({ to, subject, text, html, attachments = [] }) => {
   if (!to) {
     console.warn("📧 Email skipped: no recipient");
-    return;
+    return { error: "Email skipped: no recipient" };
   }
 
   if (!text && !html) {
     console.warn("📧 Email skipped: empty message");
-    return;
+    return { error: "Email skipped: empty message" };
   }
 
   try {
@@ -33,8 +33,11 @@ export const sendEmail = async ({ to, subject, text, html, attachments = [] }) =
       html:
         html ||
         `<pre style="font-family: Arial, white-space: pre-wrap">${text}</pre>`,
-      attachments,
     };
+
+    if (Array.isArray(attachments) && attachments.length > 0) {
+      payload.attachments = attachments;
+    }
 
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -55,21 +58,27 @@ export const sendEmail = async ({ to, subject, text, html, attachments = [] }) =
         }
 
         console.error("❌ Email provider error:", response.error);
-        return null;
+        return {
+          error:
+            response?.error?.message ||
+            response?.error?.name ||
+            "Email provider error",
+          details: response?.error,
+        };
       }
 
       if (!response?.data?.id) {
         console.error("❌ Email send returned no message id:", response);
-        return null;
+        return { error: "Email send returned no message id" };
       }
 
       console.log("📧 Email sent:", response.data.id);
       return response.data;
     }
 
-    return null;
+    return { error: "Email send attempts exhausted" };
   } catch (err) {
     console.error("❌ Email failed:", err.message);
-    return null; // DO NOT crash cron
+    return { error: err.message || "Email failed" }; // DO NOT crash cron
   }
 };

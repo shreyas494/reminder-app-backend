@@ -264,13 +264,16 @@ export const sendQuotation = async (req, res) => {
       attachments: [
         {
           filename: `${quotation.quotationNumber || "quotation"}.pdf`,
-          content: pdfBuffer.toString("base64"),
+          content: pdfBuffer,
+          contentType: "application/pdf",
         },
       ],
     });
 
     if (!sent?.id) {
-      return res.status(502).json({ message: "Failed to send quotation email" });
+      return res
+        .status(502)
+        .json({ message: sent?.error || "Failed to send quotation email" });
     }
 
     quotation.sent = true;
