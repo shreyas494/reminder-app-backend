@@ -3,6 +3,8 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const MIN_EMAIL_INTERVAL_MS = 600;
+let nextEmailAllowedAt = 0;
 
 export const sendEmail = async ({ to, subject, text, html }) => {
   if (!to) {
@@ -16,6 +18,13 @@ export const sendEmail = async ({ to, subject, text, html }) => {
   }
 
   try {
+    const waitMs = Math.max(0, nextEmailAllowedAt - Date.now());
+    if (waitMs > 0) {
+      await sleep(waitMs);
+    }
+
+    nextEmailAllowedAt = Date.now() + MIN_EMAIL_INTERVAL_MS;
+
     const payload = {
       from: `Reminder App <${process.env.EMAIL_FROM}>`,
       to,
@@ -36,6 +45,7 @@ export const sendEmail = async ({ to, subject, text, html }) => {
 
         if (isRateLimit && attempt < maxAttempts) {
           const delayMs = attempt * 1000;
+          nextEmailAllowedAt = Date.now() + delayMs;
           console.warn(
             `⚠️ Email rate-limited (attempt ${attempt}/${maxAttempts}), retrying in ${delayMs}ms...`
           );
