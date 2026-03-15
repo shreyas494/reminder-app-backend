@@ -1,10 +1,7 @@
 export function formatCurrency(amount) {
   const value = Number(amount || 0);
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  }).format(value);
+  const rounded = Math.round(value);
+  return `Rs. ${rounded}/-`;
 }
 
 function formatDate(dateValue) {
@@ -17,9 +14,9 @@ export function buildQuotationPreviewHtml(quotation) {
 
   return `
   <div style="max-width:800px;margin:0 auto;padding:24px;background:#fff;color:#111827;font-family:Arial,sans-serif;line-height:1.5;">
-    <div style="display:flex;gap:16px;align-items:flex-start;">
-      ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="width:88px;height:88px;object-fit:contain;"/>` : ""}
-      <div style="flex:1;text-align:center;">
+    <div style="position:relative;padding-left:104px;min-height:88px;">
+      ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="position:absolute;left:0;top:0;width:88px;height:88px;object-fit:contain;"/>` : ""}
+      <div style="text-align:center;">
         <h1 style="margin:0;font-size:34px;font-weight:700;">${quotation.companyName}</h1>
         <div style="font-size:14px;font-weight:600;">${quotation.companyAddress}</div>
         ${quotation.companyRegistration ? `<div style="font-size:14px;font-weight:600;">Registration Certificate No: ${quotation.companyRegistration}. Mobile No: ${quotation.companyPhone}</div>` : ""}
