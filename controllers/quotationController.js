@@ -89,7 +89,6 @@ export const createQuotationFromReminder = async (req, res) => {
 
       clientEmail: reminder.email || "",
       recipientName: reminder.clientName || reminder.contactPerson || "",
-      recipientOrganization: reminder.clientName || "",
       recipientAddress: "",
 
       subject: "Domain & Hosting Renewal Quotation",
@@ -185,7 +184,6 @@ export const updateQuotation = async (req, res) => {
       "quotationDate",
       "clientEmail",
       "recipientName",
-      "recipientOrganization",
       "recipientAddress",
       "subject",
       "introText",

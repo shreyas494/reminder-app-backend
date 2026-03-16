@@ -96,7 +96,6 @@ export async function buildQuotationPdfBuffer(quotation) {
     doc.moveDown(0.8);
     doc.font("Helvetica-Bold").fontSize(12).text("To,");
     doc.text(quotation.recipientName || "");
-    doc.text(quotation.recipientOrganization || "");
     doc.text(quotation.recipientAddress || "");
 
     doc.moveDown(0.8);

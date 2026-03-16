@@ -28,7 +28,6 @@ const quotationSchema = new mongoose.Schema(
     },
     clientEmail: { type: String, default: "" },
     recipientName: { type: String, default: "" },
-    recipientOrganization: { type: String, default: "" },
     recipientAddress: { type: String, default: "" },
 
     subject: { type: String, required: true },
