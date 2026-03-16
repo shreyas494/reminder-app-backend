@@ -11,6 +11,7 @@ function formatDate(dateValue) {
 
 export function buildQuotationPreviewHtml(quotation) {
   const showGst = quotation.quotationType === "with-gst";
+  const recipientLine = quotation.recipientOrganization || quotation.recipientName || "";
 
   return `
   <div style="max-width:800px;margin:0 auto;padding:24px;background:#fff;color:#111827;font-family:Arial,sans-serif;line-height:1.5;">
@@ -31,8 +32,7 @@ export function buildQuotationPreviewHtml(quotation) {
 
       <div style="font-size:30px;font-weight:700;">
         <div>To,</div>
-        <div>${quotation.recipientName}</div>
-        <div>${quotation.recipientOrganization}</div>
+        <div>${recipientLine}</div>
         <div>${quotation.recipientAddress}</div>
       </div>
 
@@ -81,10 +81,11 @@ export function buildQuotationPreviewHtml(quotation) {
 
 export function buildQuotationEmailPayload(quotation) {
   const html = buildQuotationPreviewHtml(quotation);
+  const recipientLine = quotation.recipientOrganization || quotation.recipientName || "";
   const text = [
     `Quotation: ${quotation.subject}`,
     `Date: ${formatDate(quotation.quotationDate)}`,
-    `To: ${quotation.recipientName}, ${quotation.recipientOrganization}`,
+    `To: ${recipientLine}`,
     `Service: ${quotation.serviceDescription}`,
     `Amount: ${formatCurrency(quotation.totalAmount)}`,
     `Payment: ${quotation.paymentTerms}`,

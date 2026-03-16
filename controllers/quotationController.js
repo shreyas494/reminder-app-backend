@@ -88,7 +88,7 @@ export const createQuotationFromReminder = async (req, res) => {
       quotationDate: new Date(),
 
       clientEmail: reminder.email || "",
-      recipientName: reminder.contactPerson || reminder.clientName || "",
+      recipientName: reminder.clientName || reminder.contactPerson || "",
       recipientOrganization: reminder.clientName || "",
       recipientAddress: "",
 
