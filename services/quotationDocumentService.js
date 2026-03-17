@@ -14,102 +14,92 @@ export function buildQuotationPreviewHtml(quotation) {
   const recipientLine = quotation.recipientName || "";
 
   return `
-  <div style="max-width:760px;margin:0 auto;background:#fff;color:#1a1a1a;font-family:Arial,sans-serif;line-height:1.5;border:1px solid #d5cfc8;">
-
-    <!-- HEADER -->
-    <div style="background:#3d1e03;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
-      <div style="display:flex;align-items:center;gap:14px;">
-        ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="width:68px;height:68px;object-fit:contain;border-radius:4px;background:#fff;padding:3px;"/>` : ""}
+  <div style="max-width:760px;margin:0 auto;background:#ffffff;color:#111827;font-family:Arial,sans-serif;line-height:1.45;border:1px solid #dbe3ef;">
+    <div style="background:linear-gradient(130deg,#0f2c5c 0%,#1d4f91 100%);padding:16px 18px;display:flex;justify-content:space-between;align-items:flex-start;">
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:4px;padding:3px;"/>` : ""}
         <div>
-          <div style="color:#fff;font-size:17px;font-weight:700;line-height:1.3;">${quotation.companyName}</div>
-          ${quotation.companyRegistration ? `<div style="color:#ccc;font-size:11px;margin-top:3px;">Reg. No: ${quotation.companyRegistration} &bull; Mobile: ${quotation.companyPhone}</div>` : ""}
-          ${quotation.companyTagline ? `<div style="color:#d4a017;font-size:11px;font-weight:600;margin-top:3px;">${quotation.companyTagline}</div>` : ""}
+          <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.2;">${quotation.companyName}</div>
+          <div style="font-size:11px;color:#d1ddf2;margin-top:4px;max-width:360px;">${quotation.companyAddress}</div>
+          ${quotation.companyTagline ? `<div style="font-size:11px;color:#eaf1ff;font-weight:600;margin-top:4px;">${quotation.companyTagline}</div>` : ""}
         </div>
       </div>
-      <div style="text-align:right;">
-        <div style="color:#d4a017;font-size:17px;font-weight:700;">Quotation</div>
-        <div style="color:#fff;font-size:11px;margin-top:5px;">Date: ${formatDate(quotation.quotationDate)}</div>
+      <div style="text-align:right;min-width:130px;">
+        <div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">QUOTATION</div>
+        <div style="font-size:11px;color:#d1ddf2;margin-top:6px;">No: ${quotation.quotationNumber || "-"}</div>
+        <div style="font-size:11px;color:#d1ddf2;margin-top:2px;">Date: ${formatDate(quotation.quotationDate)}</div>
       </div>
     </div>
 
-    <!-- CONTACT BOX -->
-    <div style="background:#fefce8;border:1px solid #e8dfc0;margin:16px 20px 8px;padding:11px 15px;border-radius:4px;">
-      <div style="font-weight:700;font-size:13px;margin-bottom:5px;">Contact</div>
-      <div style="font-size:12px;color:#444;">${quotation.companyAddress}</div>
-      ${(quotation.senderName || quotation.companyPhone) ? `<div style="font-size:12px;color:#444;">${[quotation.senderName, quotation.companyPhone].filter(Boolean).join(" &bull; ")}</div>` : ""}
+    <div style="padding:14px 18px 0;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+      <div style="border-top:2px solid #e3ebf8;padding-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:#375b91;text-transform:uppercase;">Bill To</div>
+        <div style="font-size:12px;font-weight:700;margin-top:5px;">${recipientLine}</div>
+        ${quotation.recipientAddress ? `<div style="font-size:11px;color:#4b5563;margin-top:3px;white-space:pre-wrap;">${quotation.recipientAddress}</div>` : ""}
+      </div>
+      <div style="border-top:2px solid #e3ebf8;padding-top:8px;">
+        <div style="font-size:11px;font-weight:700;color:#375b91;text-transform:uppercase;">From</div>
+        <div style="font-size:12px;font-weight:700;margin-top:5px;">${quotation.companyName}</div>
+        <div style="font-size:11px;color:#4b5563;margin-top:3px;">${quotation.companyAddress}</div>
+        ${(quotation.senderName || quotation.senderPhone) ? `<div style="font-size:11px;color:#4b5563;margin-top:3px;">${[quotation.senderName, quotation.senderPhone].filter(Boolean).join(" · ")}</div>` : ""}
+      </div>
     </div>
 
-    <!-- CONTENT -->
-    <div style="padding:12px 20px 24px;">
+    <div style="padding:12px 18px 0;">
+      <div style="font-size:14px;font-weight:700;color:#0f2c5c;">${quotation.subject}</div>
+      <p style="font-size:11px;color:#4b5563;margin:8px 0 0;white-space:pre-wrap;">${quotation.introText}</p>
+    </div>
 
-      <div style="margin-bottom:14px;">
-        <div style="font-size:13px;font-weight:700;">To,</div>
-        <div style="font-size:13px;font-weight:700;">${recipientLine}</div>
-        ${quotation.recipientAddress ? `<div style="font-size:12px;color:#555;">${quotation.recipientAddress}</div>` : ""}
-      </div>
-
-      <div style="font-size:15px;font-weight:700;margin-bottom:5px;">${quotation.subject}</div>
-      <div style="border-bottom:3px solid #d4a017;width:44px;margin-bottom:12px;"></div>
-
-      <p style="font-size:12px;color:#333;line-height:1.6;margin:0 0 14px 0;white-space:pre-wrap;">${quotation.introText}</p>
-
-      <!-- TABLE -->
-      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:12px;">
+    <div style="padding:12px 18px 0;">
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
         <thead>
-          <tr style="background:#f5f0e8;">
-            <th style="border:1px solid #c8b89a;padding:8px 10px;text-align:left;">Sr. No.</th>
-            <th style="border:1px solid #c8b89a;padding:8px 10px;text-align:left;">Description</th>
-            <th style="border:1px solid #c8b89a;padding:8px 10px;text-align:right;">Charges</th>
+          <tr>
+            <th style="background:#173a73;color:#fff;border:1px solid #c9d7ee;padding:8px;text-align:left;width:52px;">No.</th>
+            <th style="background:#173a73;color:#fff;border:1px solid #c9d7ee;padding:8px;text-align:left;">Description</th>
+            <th style="background:#173a73;color:#fff;border:1px solid #c9d7ee;padding:8px;text-align:right;width:150px;">Amount</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;">1</td>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;">${quotation.serviceDescription}</td>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;text-align:right;">${formatCurrency(quotation.amount)}</td>
+            <td style="border:1px solid #c9d7ee;padding:8px;">1</td>
+            <td style="border:1px solid #c9d7ee;padding:8px;">${quotation.serviceDescription}</td>
+            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;">${formatCurrency(quotation.amount)}</td>
           </tr>
-          ${showGst ? `
-          <tr>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;"></td>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;">GST (${quotation.gstPercent}%)</td>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;text-align:right;">${formatCurrency(quotation.gstAmount)}</td>
+          ${showGst ? `<tr>
+            <td style="border:1px solid #c9d7ee;padding:8px;"></td>
+            <td style="border:1px solid #c9d7ee;padding:8px;">GST (${quotation.gstPercent}%)</td>
+            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;">${formatCurrency(quotation.gstAmount)}</td>
           </tr>` : ""}
-          <tr style="background:#f5f0e8;">
-            <td style="border:1px solid #c8b89a;padding:8px 10px;"></td>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;font-weight:700;">Total</td>
-            <td style="border:1px solid #c8b89a;padding:8px 10px;text-align:right;font-weight:700;">${formatCurrency(quotation.totalAmount)}</td>
+          <tr>
+            <td style="border:1px solid #c9d7ee;padding:8px;"></td>
+            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;font-weight:700;background:#f1f6ff;">Total</td>
+            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;font-weight:700;background:#f1f6ff;">${formatCurrency(quotation.totalAmount)}</td>
           </tr>
         </tbody>
       </table>
+    </div>
 
-      <!-- COST HIGHLIGHT BOX -->
-      <div style="border-left:4px solid #d4a017;background:#fefce8;padding:9px 15px;margin-bottom:10px;font-size:13px;font-weight:700;">
-        Total: ${formatCurrency(quotation.totalAmount)}
+    <div style="padding:12px 18px 0;display:flex;justify-content:flex-end;">
+      <div style="background:#1d4f91;color:#fff;padding:8px 12px;font-size:11px;font-weight:700;border-radius:4px;min-width:180px;text-align:right;">
+        Amount Due: ${formatCurrency(quotation.totalAmount)}
       </div>
-
-      ${showGst ? `<div style="background:#fefce8;border:1px solid #e8dfc0;padding:7px 14px;font-size:11px;font-style:italic;color:#555;margin-bottom:12px;">Note: GST @ ${quotation.gstPercent}% is included in the above total.</div>` : ""}
-
-      <p style="font-size:12px;margin:0 0 5px 0;">Please give us your confirmation for the renewal as soon as possible.</p>
-      <p style="font-size:12px;margin:0 0 16px 0;"><strong>Payment:</strong> ${quotation.paymentTerms}</p>
-
-      <p style="font-size:12px;font-weight:700;margin:0 0 2px 0;">Thanks &amp; Regards,</p>
-      <p style="font-size:12px;font-weight:700;margin:0 0 2px 0;">For,</p>
-      <p style="font-size:12px;font-weight:700;margin:0 0 2px 0;">${quotation.companyName}</p>
-      <p style="font-size:12px;font-weight:700;margin:0 0 2px 0;">${quotation.senderName}</p>
-      <p style="font-size:12px;font-weight:700;margin:0;">${quotation.senderPhone}</p>
     </div>
 
-    <!-- FOOTER ROW -->
-    <div style="display:flex;justify-content:space-between;padding:9px 20px;border-top:1px solid #e0d5c0;background:#fcfaf6;font-size:11px;color:#555;">
-      <span>${showGst ? `GST: Add ${quotation.gstPercent}%` : "No GST"}</span>
-      <span>Validity: 15 Days</span>
+    <div style="padding:12px 18px 0;font-size:11px;color:#4b5563;">
+      <div><strong>Payment:</strong> ${quotation.paymentTerms}</div>
+      <div style="margin-top:5px;">Please give us your confirmation for the renewal as soon as possible.</div>
     </div>
 
-    <!-- BOTTOM FOOTER -->
-    <div style="text-align:center;padding:8px 20px;background:#f5f0e8;font-size:11px;color:#777;border-top:1px solid #e0d5c0;">
-      ${quotation.companyName} &mdash; Professional Web Solutions
+    <div style="padding:18px 18px 16px;display:flex;justify-content:space-between;align-items:flex-end;">
+      <div style="font-size:11px;color:#6b7280;">
+        <div>${showGst ? `GST: Add ${quotation.gstPercent}%` : "No GST"}</div>
+        <div style="margin-top:3px;">Validity: 15 Days</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:11px;color:#6b7280;">Authorized Signatory</div>
+        <div style="margin-top:18px;font-size:12px;font-weight:700;color:#111827;">${quotation.senderName || quotation.companyName}</div>
+      </div>
     </div>
-
   </div>`;
 }
 
