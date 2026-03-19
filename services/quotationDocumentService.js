@@ -92,7 +92,6 @@ export function buildQuotationPreviewHtml(quotation) {
 
     <div style="padding:18px 18px 16px;display:flex;justify-content:space-between;align-items:flex-end;">
       <div style="font-size:11px;color:#6b7280;">
-        <div>${showGst ? `GST: Add ${quotation.gstPercent}%` : "No GST"}</div>
         <div style="margin-top:3px;">Validity: 15 Days</div>
       </div>
       <div style="text-align:right;">
