@@ -13,7 +13,7 @@ function generateQuotationNumber() {
   return `${prefix}-${timestamp}-${random}`;
 }
 
-const FALLBACK_LOGO_URL = "https://reminder-app-backend-aaac.onrender.com/assets/company-logo.png";
+const FALLBACK_LOGO_URL = "https://reminder-app-backend-u8wb.onrender.com/assets/company-logo.png";
 
 function resolveLogoUrl(value) {
   const raw = String(value || "").trim();
@@ -127,10 +127,26 @@ export const getQuotations = async (req, res) => {
     const limit = 10;
     const skip = (page - 1) * limit;
 
-    const [data, total] = await Promise.all([
-      Quotation.find({ user: req.user.id }).sort({ createdAt: -1 }).skip(skip).limit(limit),
-      Quotation.countDocuments({ user: req.user.id }),
-    ]);
+    const allQuotations = await Quotation.find({ user: req.user.id })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .lean();
+
+    const latestByReminder = [];
+    const seenReminderIds = new Set();
+
+    for (const quotation of allQuotations) {
+      const reminderKey = quotation.reminder ? String(quotation.reminder) : String(quotation._id);
+
+      if (seenReminderIds.has(reminderKey)) {
+        continue;
+      }
+
+      seenReminderIds.add(reminderKey);
+      latestByReminder.push(quotation);
+    }
+
+    const total = latestByReminder.length;
+    const data = latestByReminder.slice(skip, skip + limit);
 
     res.json({
       data,
