@@ -53,6 +53,11 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
+/* ---------- PING (ultra-light keep-alive) ---------- */
+app.get("/api/ping", (req, res) => {
+  res.status(204).end();
+});
+
 /* ---------- ROUTES ---------- */
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
