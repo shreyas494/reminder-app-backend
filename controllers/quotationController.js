@@ -298,13 +298,17 @@ export const sendQuotation = async (req, res) => {
 
     const reminder = await Reminder.findById(quotation.reminder).lean();
 
+    const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
+    quotation.paymentStatus = paymentState.paymentStatus;
+    quotation.balanceDue = paymentState.balanceDue;
+
     let paymentLinkUrl = quotation.paymentLinkUrl;
     let paymentLinkId = quotation.paymentLinkId;
     let paymentLinkWarning = "";
 
     const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
 
-    if (!paymentLinkUrl && dueAmount > 0) {
+    if (dueAmount > 0) {
       try {
         const paymentLink = await createPaymentLinkForQuotation({
           quotation,
@@ -321,17 +325,12 @@ export const sendQuotation = async (req, res) => {
       }
     }
 
-    const incomingPdfBase64 = typeof req.body?.pdfBase64 === "string" ? req.body.pdfBase64 : "";
+    const quotationForPdf = {
+      ...quotation.toObject(),
+      paymentLinkUrl: paymentLinkUrl || "",
+    };
 
-    let pdfBuffer;
-    if (incomingPdfBase64) {
-      const normalizedBase64 = incomingPdfBase64.includes(",")
-        ? incomingPdfBase64.split(",").pop()
-        : incomingPdfBase64;
-      pdfBuffer = Buffer.from(normalizedBase64, "base64");
-    } else {
-      pdfBuffer = await buildQuotationPdfBuffer(quotation);
-    }
+    const pdfBuffer = await buildQuotationPdfBuffer(quotationForPdf);
 
     const sent = await sendEmail({
       to: quotation.clientEmail,

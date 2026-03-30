@@ -134,6 +134,16 @@ export async function buildQuotationPdfBuffer(quotation) {
     doc.y = y + 16;
     doc.font("Helvetica").fontSize(11).text(`Payment: ${quotation.paymentTerms || "100% advance along with the Purchase Order."}`);
 
+    if (quotation.paymentLinkUrl) {
+      doc.moveDown(0.8);
+      doc.font("Helvetica-Bold").fontSize(11).text("Payment Link:");
+      doc.font("Helvetica").fontSize(10).fillColor("#2563EB").text(quotation.paymentLinkUrl, {
+        link: quotation.paymentLinkUrl,
+        underline: true,
+      });
+      doc.fillColor("black");
+    }
+
     doc.moveDown(1.2);
     doc.font("Helvetica-Bold").text("Thanks & Regards,");
     doc.text("For,");
