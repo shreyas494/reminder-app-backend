@@ -486,10 +486,26 @@ export const generateQuotationPaymentLink = async (req, res) => {
       id: quotation._id,
       amount: quotation.totalAmount,
       amountPaid: quotation.amountPaid,
+      reminderRef: quotation.reminder,
       existingPaymentLinkUrl: quotation.paymentLinkUrl ? "yes" : "no",
     });
 
-    const reminder = await Reminder.findById(quotation.reminder).lean();
+    let reminder = null;
+    if (quotation.reminder) {
+      try {
+        reminder = await Reminder.findById(quotation.reminder).lean();
+        console.log(`[PAYMENT LINK] Reminder found:`, {
+          reminderId: reminder?._id,
+          mobile1: reminder?.mobile1,
+          mobile2: reminder?.mobile2,
+        });
+      } catch (reminderErr) {
+        console.error(`[PAYMENT LINK] Error fetching reminder:`, reminderErr?.message);
+        reminder = null;
+      }
+    } else {
+      console.log(`[PAYMENT LINK] Quotation has no reminder reference`);
+    }
 
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
     quotation.paymentStatus = paymentState.paymentStatus;
@@ -523,11 +539,18 @@ export const generateQuotationPaymentLink = async (req, res) => {
     while (retries < maxRetries) {
       try {
         console.log(`[PAYMENT LINK GENERATION] Attempt ${retries + 1}/${maxRetries}`);
+        console.log(`[PAYMENT LINK GENERATION] Creating link with:`, {
+          quotationId: quotation._id,
+          recipientName: quotation.recipientName,
+          clientEmail: quotation.clientEmail,
+          phone: reminder?.mobile1 || reminder?.mobile2 || "none",
+        });
+
         paymentLink = await createPaymentLinkForQuotation({
           quotation,
           clientName: quotation.recipientName,
           clientEmail: quotation.clientEmail,
-          clientPhone: reminder?.mobile1 || reminder?.mobile2,
+          clientPhone: reminder?.mobile1 || reminder?.mobile2, // Safe to be undefined
         });
 
         console.log("[PAYMENT LINK GENERATION] Payment link response received:", {
