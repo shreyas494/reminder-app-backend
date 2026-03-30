@@ -370,7 +370,7 @@ export const sendQuotation = async (req, res) => {
     });
   } catch (err) {
     console.error("[QUOTATION] Send failed:", err?.message || err);
-    res.status(500).json({ message: "Failed to send quotation" });
+    res.status(500).json({ message: err?.message || "Failed to send quotation" });
   }
 };
 
