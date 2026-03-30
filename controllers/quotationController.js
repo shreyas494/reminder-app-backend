@@ -300,19 +300,25 @@ export const sendQuotation = async (req, res) => {
 
     let paymentLinkUrl = quotation.paymentLinkUrl;
     let paymentLinkId = quotation.paymentLinkId;
+    let paymentLinkWarning = "";
 
     const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
 
     if (!paymentLinkUrl && dueAmount > 0) {
-      const paymentLink = await createPaymentLinkForQuotation({
-        quotation,
-        clientName: quotation.recipientName,
-        clientEmail: quotation.clientEmail,
-        clientPhone: reminder?.mobile1 || reminder?.mobile2,
-      });
+      try {
+        const paymentLink = await createPaymentLinkForQuotation({
+          quotation,
+          clientName: quotation.recipientName,
+          clientEmail: quotation.clientEmail,
+          clientPhone: reminder?.mobile1 || reminder?.mobile2,
+        });
 
-      paymentLinkUrl = paymentLink.shortUrl;
-      paymentLinkId = paymentLink.id;
+        paymentLinkUrl = paymentLink.shortUrl;
+        paymentLinkId = paymentLink.id;
+      } catch (linkErr) {
+        paymentLinkWarning = linkErr?.message || "Payment link generation skipped";
+        console.warn("[QUOTATION] Payment link creation skipped:", paymentLinkWarning);
+      }
     }
 
     const incomingPdfBase64 = typeof req.body?.pdfBase64 === "string" ? req.body.pdfBase64 : "";
@@ -332,10 +338,10 @@ export const sendQuotation = async (req, res) => {
       subject: `${quotation.subject} - ${quotation.quotationNumber}`,
       text: paymentLinkUrl
         ? `Dear ${quotation.recipientName || "Client"},\n\nPlease find your quotation attached.\n\nPayment Link: ${paymentLinkUrl}\n\nThank you.`
-        : `Dear ${quotation.recipientName || "Client"},\n\nPlease find your quotation attached.\n\nThank you.`,
+        : `Dear ${quotation.recipientName || "Client"},\n\nPlease find your quotation attached.\n\nPayment Link is currently unavailable in test mode. Please contact us to proceed with payment.\n\nThank you.`,
       html: paymentLinkUrl
         ? `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111827"><p>Dear ${quotation.recipientName || "Client"},</p><p>Please find your quotation attached.</p><p><a href="${paymentLinkUrl}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Pay Now</a></p><p style="font-size:12px;color:#4b5563">If button doesn't work, use this link:<br/><a href="${paymentLinkUrl}">${paymentLinkUrl}</a></p><p>Thank you.</p></body></html>`
-        : "<!doctype html><html><body><div style=\"font-size:1px;line-height:1px;color:#ffffff;\">.</div></body></html>",
+        : "<!doctype html><html><body style=\"font-family:Arial,sans-serif;color:#111827\"><p>Please find your quotation attached.</p><p style=\"font-size:13px;color:#4b5563\">Payment link is currently unavailable in test mode. Please contact us to proceed with payment.</p><p>Thank you.</p></body></html>",
       attachments: [
         {
           filename: `${quotation.quotationNumber || "quotation"}.pdf`,
@@ -366,6 +372,7 @@ export const sendQuotation = async (req, res) => {
       messageId: sent.id,
       paymentLinkUrl: quotation.paymentLinkUrl,
       paymentLinkId: quotation.paymentLinkId,
+      paymentLinkWarning,
       quotation,
     });
   } catch (err) {
