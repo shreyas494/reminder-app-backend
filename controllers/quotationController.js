@@ -332,6 +332,11 @@ export const updateQuotation = async (req, res) => {
     }
 
     if (!hasAnyChange) {
+      // No changes to quotation fields, but we still want to allow fresh payment link generation
+      // So we clear the old payment link so a new one can be generated on next send
+      existingQuotation.paymentLinkUrl = "";
+      existingQuotation.paymentLinkId = "";
+      await existingQuotation.save();
       return res.json(existingQuotation);
     }
 
@@ -466,6 +471,8 @@ export const sendQuotation = async (req, res) => {
 
 export const generateQuotationPaymentLink = async (req, res) => {
   try {
+    console.log(`[PAYMENT LINK] Generating link for quotation ${req.params.id}`);
+    
     const quotation = await Quotation.findOne({
       _id: req.params.id,
       user: req.user.id,
@@ -475,17 +482,32 @@ export const generateQuotationPaymentLink = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
+    console.log(`[PAYMENT LINK] Quotation found:`, {
+      id: quotation._id,
+      amount: quotation.totalAmount,
+      amountPaid: quotation.amountPaid,
+      existingPaymentLinkUrl: quotation.paymentLinkUrl ? "yes" : "no",
+    });
+
     const reminder = await Reminder.findById(quotation.reminder).lean();
 
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
     quotation.paymentStatus = paymentState.paymentStatus;
     quotation.balanceDue = paymentState.balanceDue;
 
+    console.log(`[PAYMENT LINK] Payment state:`, {
+      totalAmount: quotation.totalAmount,
+      amountPaid: quotation.amountPaid,
+      balanceDue: quotation.balanceDue,
+      paymentStatus: quotation.paymentStatus,
+    });
+
     const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
     if (dueAmount <= 0) {
       quotation.paymentLinkUrl = "";
       quotation.paymentLinkId = "";
       await quotation.save();
+      console.log(`[PAYMENT LINK] No payment due - returning empty link`);
       return res.json({
         message: "No payment due",
         paymentLinkUrl: "",
