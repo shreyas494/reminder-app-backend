@@ -244,6 +244,10 @@ export const updateQuotation = async (req, res) => {
       "companyLogoUrl",
     ];
 
+    const previousAmount = Number(quotation.amount || 0);
+    const previousQuotationType = quotation.quotationType;
+    const previousGstPercent = Number(quotation.gstPercent || 0);
+
     for (const field of allowedFields) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
         quotation[field] = req.body[field];
@@ -263,6 +267,19 @@ export const updateQuotation = async (req, res) => {
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
     quotation.paymentStatus = paymentState.paymentStatus;
     quotation.balanceDue = paymentState.balanceDue;
+
+    const hasFinancialChange =
+      Number(quotation.amount || 0) !== previousAmount ||
+      quotation.quotationType !== previousQuotationType ||
+      Number(quotation.gstPercent || 0) !== previousGstPercent;
+
+    if (hasFinancialChange) {
+      quotation.paymentLinkId = "";
+      quotation.paymentLinkUrl = "";
+      quotation.paymentLinkedAt = null;
+      quotation.sent = false;
+      quotation.sentAt = null;
+    }
 
     quotation.reviewed = true;
     quotation.reviewedAt = new Date();
@@ -296,41 +313,33 @@ export const sendQuotation = async (req, res) => {
       return res.status(400).json({ message: "Client email is required" });
     }
 
-    const reminder = await Reminder.findById(quotation.reminder).lean();
-
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
     quotation.paymentStatus = paymentState.paymentStatus;
     quotation.balanceDue = paymentState.balanceDue;
 
-    let paymentLinkUrl = quotation.paymentLinkUrl;
-    let paymentLinkId = quotation.paymentLinkId;
-    let paymentLinkWarning = "";
+    const incomingPaymentLinkUrl =
+      typeof req.body?.paymentLinkUrl === "string" ? req.body.paymentLinkUrl.trim() : "";
+    const incomingPaymentLinkId =
+      typeof req.body?.paymentLinkId === "string" ? req.body.paymentLinkId.trim() : "";
+    const paymentLinkUrl = incomingPaymentLinkUrl || quotation.paymentLinkUrl || "";
 
-    const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
+    const incomingPdfBase64 = typeof req.body?.pdfBase64 === "string" ? req.body.pdfBase64 : "";
 
-    if (dueAmount > 0) {
-      try {
-        const paymentLink = await createPaymentLinkForQuotation({
-          quotation,
-          clientName: quotation.recipientName,
-          clientEmail: quotation.clientEmail,
-          clientPhone: reminder?.mobile1 || reminder?.mobile2,
-        });
-
-        paymentLinkUrl = paymentLink.shortUrl;
-        paymentLinkId = paymentLink.id;
-      } catch (linkErr) {
-        paymentLinkWarning = linkErr?.message || "Payment link generation skipped";
-        console.warn("[QUOTATION] Payment link creation skipped:", paymentLinkWarning);
-      }
+    if (!incomingPdfBase64) {
+      return res.status(400).json({
+        message: "PDF content missing. Please regenerate quotation and send again.",
+      });
     }
 
-    const quotationForPdf = {
-      ...quotation.toObject(),
-      paymentLinkUrl: paymentLinkUrl || "",
-    };
+    const normalizedBase64 = incomingPdfBase64.includes(",")
+      ? incomingPdfBase64.split(",").pop()
+      : incomingPdfBase64;
+    const pdfBuffer = Buffer.from(normalizedBase64, "base64");
 
-    const pdfBuffer = await buildQuotationPdfBuffer(quotationForPdf);
+    const attachmentStamp = new Date()
+      .toISOString()
+      .replace(/[-:TZ.]/g, "")
+      .slice(0, 14);
 
     const sent = await sendEmail({
       to: quotation.clientEmail,
@@ -343,7 +352,7 @@ export const sendQuotation = async (req, res) => {
         : "<!doctype html><html><body style=\"font-family:Arial,sans-serif;color:#111827\"><p>Please find your quotation attached.</p><p style=\"font-size:13px;color:#4b5563\">Payment link is currently unavailable in test mode. Please contact us to proceed with payment.</p><p>Thank you.</p></body></html>",
       attachments: [
         {
-          filename: `${quotation.quotationNumber || "quotation"}.pdf`,
+          filename: `${quotation.quotationNumber || "quotation"}-${attachmentStamp}.pdf`,
           content: pdfBuffer,
           contentType: "application/pdf",
         },
@@ -359,7 +368,7 @@ export const sendQuotation = async (req, res) => {
     quotation.sent = true;
     quotation.sentAt = new Date();
     quotation.paymentProvider = "razorpay";
-    quotation.paymentLinkId = paymentLinkId || quotation.paymentLinkId;
+    quotation.paymentLinkId = incomingPaymentLinkId || quotation.paymentLinkId;
     quotation.paymentLinkUrl = paymentLinkUrl || quotation.paymentLinkUrl;
     if (paymentLinkUrl && !quotation.paymentLinkedAt) {
       quotation.paymentLinkedAt = new Date();
@@ -371,12 +380,101 @@ export const sendQuotation = async (req, res) => {
       messageId: sent.id,
       paymentLinkUrl: quotation.paymentLinkUrl,
       paymentLinkId: quotation.paymentLinkId,
-      paymentLinkWarning,
       quotation,
     });
   } catch (err) {
     console.error("[QUOTATION] Send failed:", err?.message || err);
     res.status(500).json({ message: err?.message || "Failed to send quotation" });
+  }
+};
+
+export const generateQuotationPaymentLink = async (req, res) => {
+  try {
+    const quotation = await Quotation.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+    });
+
+    if (!quotation) {
+      return res.status(404).json({ message: "Quotation not found" });
+    }
+
+    const reminder = await Reminder.findById(quotation.reminder).lean();
+
+    const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
+    quotation.paymentStatus = paymentState.paymentStatus;
+    quotation.balanceDue = paymentState.balanceDue;
+
+    const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
+    if (dueAmount <= 0) {
+      quotation.paymentLinkUrl = "";
+      quotation.paymentLinkId = "";
+      await quotation.save();
+      return res.json({
+        message: "No payment due",
+        paymentLinkUrl: "",
+        paymentLinkId: "",
+        quotation,
+      });
+    }
+
+    const paymentLink = await createPaymentLinkForQuotation({
+      quotation,
+      clientName: quotation.recipientName,
+      clientEmail: quotation.clientEmail,
+      clientPhone: reminder?.mobile1 || reminder?.mobile2,
+    });
+
+    quotation.paymentProvider = "razorpay";
+    quotation.paymentLinkId = paymentLink.id;
+    quotation.paymentLinkUrl = paymentLink.shortUrl;
+    quotation.paymentLinkedAt = new Date();
+    await quotation.save();
+
+    res.json({
+      message: "Payment link generated",
+      paymentLinkUrl: quotation.paymentLinkUrl,
+      paymentLinkId: quotation.paymentLinkId,
+      quotation,
+    });
+  } catch (err) {
+    console.error("[QUOTATION] Payment link generation failed:", err?.message || err);
+    res.status(500).json({ message: err?.message || "Failed to generate payment link" });
+  }
+};
+
+export const downloadQuotationPdf = async (req, res) => {
+  try {
+    const quotation = await Quotation.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+    });
+
+    if (!quotation) {
+      return res.status(404).json({ message: "Quotation not found" });
+    }
+
+    const incomingPaymentLinkUrl =
+      typeof req.body?.paymentLinkUrl === "string" ? req.body.paymentLinkUrl.trim() : "";
+    const paymentLinkUrl = incomingPaymentLinkUrl || quotation.paymentLinkUrl || "";
+
+    const quotationForPdf = {
+      ...quotation.toObject(),
+      paymentLinkUrl,
+    };
+
+    const pdfBuffer = await buildQuotationPdfBuffer(quotationForPdf);
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${quotation.quotationNumber || "quotation"}.pdf"`
+    );
+
+    return res.send(pdfBuffer);
+  } catch (err) {
+    console.error("[QUOTATION] PDF download failed:", err?.message || err);
+    return res.status(500).json({ message: err?.message || "Failed to download quotation PDF" });
   }
 };
 

@@ -1,4 +1,5 @@
 import Razorpay from "razorpay";
+import crypto from "crypto";
 
 const hasRazorpayConfig = () =>
   Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
@@ -21,6 +22,13 @@ const normalizeContact = (phone) => {
   return raw;
 };
 
+const buildUniqueReferenceId = (quotation) => {
+  const baseId = String(quotation?._id || "").slice(-12) || "quotation";
+  const timestamp = Date.now().toString(36);
+  const random = crypto.randomBytes(3).toString("hex");
+  return `${baseId}-${timestamp}-${random}`;
+};
+
 export const createPaymentLinkForQuotation = async ({ quotation, clientName, clientEmail, clientPhone }) => {
   const razorpay = getRazorpayClient();
   if (!razorpay) {
@@ -37,7 +45,7 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
   const payload = {
     amount: amountInPaise,
     currency: "INR",
-    reference_id: String(quotation.quotationNumber || quotation._id),
+    reference_id: buildUniqueReferenceId(quotation),
     description: `${quotation.subject || "Quotation Payment"} (${quotation.quotationNumber || quotation._id})`,
     notify: {
       sms: Boolean(clientPhone),
@@ -48,6 +56,16 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
       quotationId: String(quotation._id),
       quotationNumber: String(quotation.quotationNumber || ""),
       clientEmail: String(clientEmail || ""),
+    },
+    options: {
+      checkout: {
+        method: {
+          upi: 1,
+          card: 1,
+          netbanking: 1,
+          wallet: 1,
+        },
+      },
     },
   };
 

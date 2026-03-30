@@ -5,6 +5,8 @@ import {
   getQuotations,
   getQuotationById,
   updateQuotation,
+  generateQuotationPaymentLink,
+  downloadQuotationPdf,
   sendQuotation,
   deleteQuotation,
 } from "../controllers/quotationController.js";
@@ -17,6 +19,8 @@ router.get("/", getQuotations);
 router.post("/from-reminder/:reminderId", createQuotationFromReminder);
 router.get("/:id", getQuotationById);
 router.put("/:id", updateQuotation);
+router.post("/:id/payment-link", generateQuotationPaymentLink);
+router.post("/:id/pdf", downloadQuotationPdf);
 router.post("/:id/send", sendQuotation);
 router.delete("/:id", deleteQuotation);
 
