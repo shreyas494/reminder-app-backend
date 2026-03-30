@@ -91,3 +91,25 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
     raw: response,
   };
 };
+
+export const fetchPaymentLinkDetails = async (paymentLinkId) => {
+  const razorpay = getRazorpayClient();
+  if (!razorpay) {
+    throw new Error("Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.");
+  }
+
+  if (!paymentLinkId) {
+    throw new Error("Payment link id is required");
+  }
+
+  const response = await razorpay.paymentLink.fetch(paymentLinkId);
+
+  return {
+    id: response.id,
+    status: response.status,
+    amount: Number(response.amount || 0),
+    amountPaid: Number(response.amount_paid || 0),
+    shortUrl: response.short_url,
+    raw: response,
+  };
+};

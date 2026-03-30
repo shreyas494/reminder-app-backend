@@ -5,7 +5,7 @@ import {
   buildQuotationPreviewHtml,
 } from "../services/quotationDocumentService.js";
 import { buildQuotationPdfBuffer } from "../services/quotationPdfService.js";
-import { createPaymentLinkForQuotation } from "../services/paymentLinkService.js";
+import { createPaymentLinkForQuotation, fetchPaymentLinkDetails } from "../services/paymentLinkService.js";
 
 function generateQuotationNumber() {
   const prefix = process.env.QUOTATION_PREFIX || "QTN";
@@ -93,6 +93,51 @@ function hasQuotationFieldChanged(field, previousValue, nextValue) {
   return String(previousValue ?? "").trim() !== String(nextValue ?? "").trim();
 }
 
+function mapRazorpayLinkStatusToPaymentStatus(linkStatus, amountPaid, totalAmount) {
+  const paid = Number(amountPaid || 0);
+  const total = Number(totalAmount || 0);
+
+  if (paid > 0 && paid >= total) return "paid";
+  if (paid > 0 && paid < total) return "partial";
+  if (linkStatus === "expired") return "expired";
+  if (linkStatus === "cancelled") return "failed";
+  return "unpaid";
+}
+
+async function syncQuotationPaymentStatus(quotation) {
+  if (!quotation?.paymentLinkId) return quotation;
+
+  const details = await fetchPaymentLinkDetails(quotation.paymentLinkId);
+  const amountPaid = Number(details.amountPaid || 0) / 100;
+  const paymentStatus = mapRazorpayLinkStatusToPaymentStatus(
+    details.status,
+    amountPaid,
+    quotation.totalAmount
+  );
+  const balanceDue = Math.max(0, Number(quotation.totalAmount || 0) - amountPaid);
+
+  const hasChanged =
+    quotation.paymentStatus !== paymentStatus ||
+    Number(quotation.amountPaid || 0) !== amountPaid ||
+    Number(quotation.balanceDue || 0) !== balanceDue ||
+    (details.shortUrl && quotation.paymentLinkUrl !== details.shortUrl);
+
+  if (!hasChanged) return quotation;
+
+  quotation.paymentStatus = paymentStatus;
+  quotation.amountPaid = amountPaid;
+  quotation.balanceDue = balanceDue;
+  if (details.shortUrl) {
+    quotation.paymentLinkUrl = details.shortUrl;
+  }
+  if (paymentStatus === "paid" && !quotation.paidAt) {
+    quotation.paidAt = new Date();
+  }
+
+  await quotation.save();
+  return quotation;
+}
+
 export const createQuotationFromReminder = async (req, res) => {
   try {
     const { reminderId } = req.params;
@@ -166,9 +211,33 @@ export const getQuotations = async (req, res) => {
     const page = Number(req.query.page) || 1;
     const limit = 10;
     const skip = (page - 1) * limit;
+    const statusFilter = String(req.query.status || "").trim().toLowerCase();
 
-    const total = await Quotation.countDocuments({ user: req.user.id });
-    const data = await Quotation.find({ user: req.user.id })
+    const query = { user: req.user.id };
+    if (["paid", "unpaid", "partial", "failed", "expired"].includes(statusFilter)) {
+      query.paymentStatus = statusFilter;
+    }
+
+    const candidatesForSync = await Quotation.find({
+      user: req.user.id,
+      paymentLinkId: { $ne: "" },
+      paymentStatus: { $in: ["unpaid", "partial"] },
+    })
+      .sort({ updatedAt: -1 })
+      .limit(20);
+
+    await Promise.all(
+      candidatesForSync.map(async (quotation) => {
+        try {
+          await syncQuotationPaymentStatus(quotation);
+        } catch (syncErr) {
+          console.warn("[QUOTATION] Payment sync skipped:", syncErr?.message || syncErr);
+        }
+      })
+    );
+
+    const total = await Quotation.countDocuments(query);
+    const data = await Quotation.find(query)
       .sort({ createdAt: -1, updatedAt: -1 })
       .skip(skip)
       .limit(limit)
