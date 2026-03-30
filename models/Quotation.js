@@ -41,6 +41,19 @@ const quotationSchema = new mongoose.Schema(
     gstAmount: { type: Number, default: 0 },
     totalAmount: { type: Number, default: 0 },
 
+    paymentProvider: { type: String, default: "razorpay" },
+    paymentLinkId: { type: String, default: "" },
+    paymentLinkUrl: { type: String, default: "" },
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "partial", "paid", "failed", "expired"],
+      default: "unpaid",
+    },
+    amountPaid: { type: Number, default: 0 },
+    balanceDue: { type: Number, default: 0 },
+    paymentLinkedAt: { type: Date, default: null },
+    paidAt: { type: Date, default: null },
+
     senderName: { type: String, default: "" },
     senderPhone: { type: String, default: "" },
 

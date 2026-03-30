@@ -5,6 +5,7 @@ import {
   buildQuotationPreviewHtml,
 } from "../services/quotationDocumentService.js";
 import { buildQuotationPdfBuffer } from "../services/quotationPdfService.js";
+import { createPaymentLinkForQuotation } from "../services/paymentLinkService.js";
 
 function generateQuotationNumber() {
   const prefix = process.env.QUOTATION_PREFIX || "QTN";
@@ -62,6 +63,22 @@ function deriveAmounts(amount, quotationType, gstPercent) {
   };
 }
 
+function derivePaymentState(totalAmount, amountPaid = 0) {
+  const total = Number(totalAmount || 0);
+  const paid = Number(amountPaid || 0);
+  const balanceDue = Math.max(0, total - paid);
+
+  let paymentStatus = "unpaid";
+  if (paid > 0 && balanceDue > 0) {
+    paymentStatus = "partial";
+  }
+  if (balanceDue === 0 && total > 0) {
+    paymentStatus = "paid";
+  }
+
+  return { paymentStatus, balanceDue };
+}
+
 export const createQuotationFromReminder = async (req, res) => {
   try {
     const { reminderId } = req.params;
@@ -106,6 +123,15 @@ export const createQuotationFromReminder = async (req, res) => {
       gstPercent,
       gstAmount: amounts.gstAmount,
       totalAmount: amounts.totalAmount,
+
+      paymentProvider: "razorpay",
+      paymentLinkId: "",
+      paymentLinkUrl: "",
+      paymentStatus: "unpaid",
+      amountPaid: 0,
+      balanceDue: amounts.totalAmount,
+      paymentLinkedAt: null,
+      paidAt: null,
 
       ...defaults,
       reviewed: false,
@@ -234,6 +260,10 @@ export const updateQuotation = async (req, res) => {
     quotation.gstAmount = amounts.gstAmount;
     quotation.totalAmount = amounts.totalAmount;
 
+    const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
+    quotation.paymentStatus = paymentState.paymentStatus;
+    quotation.balanceDue = paymentState.balanceDue;
+
     quotation.reviewed = true;
     quotation.reviewedAt = new Date();
 
@@ -266,6 +296,25 @@ export const sendQuotation = async (req, res) => {
       return res.status(400).json({ message: "Client email is required" });
     }
 
+    const reminder = await Reminder.findById(quotation.reminder).lean();
+
+    let paymentLinkUrl = quotation.paymentLinkUrl;
+    let paymentLinkId = quotation.paymentLinkId;
+
+    const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
+
+    if (!paymentLinkUrl && dueAmount > 0) {
+      const paymentLink = await createPaymentLinkForQuotation({
+        quotation,
+        clientName: quotation.recipientName,
+        clientEmail: quotation.clientEmail,
+        clientPhone: reminder?.mobile1 || reminder?.mobile2,
+      });
+
+      paymentLinkUrl = paymentLink.shortUrl;
+      paymentLinkId = paymentLink.id;
+    }
+
     const incomingPdfBase64 = typeof req.body?.pdfBase64 === "string" ? req.body.pdfBase64 : "";
 
     let pdfBuffer;
@@ -281,7 +330,12 @@ export const sendQuotation = async (req, res) => {
     const sent = await sendEmail({
       to: quotation.clientEmail,
       subject: `${quotation.subject} - ${quotation.quotationNumber}`,
-      html: "<!doctype html><html><body><div style=\"font-size:1px;line-height:1px;color:#ffffff;\">.</div></body></html>",
+      text: paymentLinkUrl
+        ? `Dear ${quotation.recipientName || "Client"},\n\nPlease find your quotation attached.\n\nPayment Link: ${paymentLinkUrl}\n\nThank you.`
+        : `Dear ${quotation.recipientName || "Client"},\n\nPlease find your quotation attached.\n\nThank you.`,
+      html: paymentLinkUrl
+        ? `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#111827"><p>Dear ${quotation.recipientName || "Client"},</p><p>Please find your quotation attached.</p><p><a href="${paymentLinkUrl}" style="display:inline-block;padding:10px 16px;background:#2563eb;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Pay Now</a></p><p style="font-size:12px;color:#4b5563">If button doesn't work, use this link:<br/><a href="${paymentLinkUrl}">${paymentLinkUrl}</a></p><p>Thank you.</p></body></html>`
+        : "<!doctype html><html><body><div style=\"font-size:1px;line-height:1px;color:#ffffff;\">.</div></body></html>",
       attachments: [
         {
           filename: `${quotation.quotationNumber || "quotation"}.pdf`,
@@ -299,9 +353,21 @@ export const sendQuotation = async (req, res) => {
 
     quotation.sent = true;
     quotation.sentAt = new Date();
+    quotation.paymentProvider = "razorpay";
+    quotation.paymentLinkId = paymentLinkId || quotation.paymentLinkId;
+    quotation.paymentLinkUrl = paymentLinkUrl || quotation.paymentLinkUrl;
+    if (paymentLinkUrl && !quotation.paymentLinkedAt) {
+      quotation.paymentLinkedAt = new Date();
+    }
     await quotation.save();
 
-    res.json({ message: "Quotation email sent", messageId: sent.id, quotation });
+    res.json({
+      message: "Quotation email sent",
+      messageId: sent.id,
+      paymentLinkUrl: quotation.paymentLinkUrl,
+      paymentLinkId: quotation.paymentLinkId,
+      quotation,
+    });
   } catch (err) {
     console.error("[QUOTATION] Send failed:", err?.message || err);
     res.status(500).json({ message: "Failed to send quotation" });
