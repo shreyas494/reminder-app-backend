@@ -79,6 +79,20 @@ function derivePaymentState(totalAmount, amountPaid = 0) {
   return { paymentStatus, balanceDue };
 }
 
+function hasQuotationFieldChanged(field, previousValue, nextValue) {
+  if (field === "quotationDate") {
+    const previousTime = previousValue ? new Date(previousValue).getTime() : 0;
+    const nextTime = nextValue ? new Date(nextValue).getTime() : 0;
+    return previousTime !== nextTime;
+  }
+
+  if (field === "amount" || field === "gstPercent") {
+    return Number(previousValue || 0) !== Number(nextValue || 0);
+  }
+
+  return String(previousValue ?? "").trim() !== String(nextValue ?? "").trim();
+}
+
 export const createQuotationFromReminder = async (req, res) => {
   try {
     const { reminderId } = req.params;
@@ -153,26 +167,12 @@ export const getQuotations = async (req, res) => {
     const limit = 10;
     const skip = (page - 1) * limit;
 
-    const allQuotations = await Quotation.find({ user: req.user.id })
-      .sort({ updatedAt: -1, createdAt: -1 })
+    const total = await Quotation.countDocuments({ user: req.user.id });
+    const data = await Quotation.find({ user: req.user.id })
+      .sort({ createdAt: -1, updatedAt: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
-
-    const latestByReminder = [];
-    const seenReminderIds = new Set();
-
-    for (const quotation of allQuotations) {
-      const reminderKey = quotation.reminder ? String(quotation.reminder) : String(quotation._id);
-
-      if (seenReminderIds.has(reminderKey)) {
-        continue;
-      }
-
-      seenReminderIds.add(reminderKey);
-      latestByReminder.push(quotation);
-    }
-
-    const total = latestByReminder.length;
-    const data = latestByReminder.slice(skip, skip + limit);
 
     res.json({
       data,
@@ -212,12 +212,12 @@ export const getQuotationById = async (req, res) => {
 
 export const updateQuotation = async (req, res) => {
   try {
-    const quotation = await Quotation.findOne({
+    const existingQuotation = await Quotation.findOne({
       _id: req.params.id,
       user: req.user.id,
     });
 
-    if (!quotation) {
+    if (!existingQuotation) {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
@@ -244,48 +244,55 @@ export const updateQuotation = async (req, res) => {
       "companyLogoUrl",
     ];
 
-    const previousAmount = Number(quotation.amount || 0);
-    const previousQuotationType = quotation.quotationType;
-    const previousGstPercent = Number(quotation.gstPercent || 0);
+    const quotationData = existingQuotation.toObject();
+    delete quotationData._id;
+    delete quotationData.__v;
+    delete quotationData.createdAt;
+    delete quotationData.updatedAt;
+
+    let hasAnyChange = false;
 
     for (const field of allowedFields) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
-        quotation[field] = req.body[field];
+        const incomingValue = req.body[field];
+        if (hasQuotationFieldChanged(field, quotationData[field], incomingValue)) {
+          hasAnyChange = true;
+        }
+        quotationData[field] = incomingValue;
       }
     }
 
-    if (!["with-gst", "without-gst"].includes(quotation.quotationType)) {
+    if (!hasAnyChange) {
+      return res.json(existingQuotation);
+    }
+
+    if (!["with-gst", "without-gst"].includes(quotationData.quotationType)) {
       return res.status(400).json({ message: "Invalid quotation type" });
     }
 
-    const gstPercent = Number(quotation.gstPercent || 0);
-    const amounts = deriveAmounts(quotation.amount, quotation.quotationType, gstPercent);
-    quotation.amount = amounts.amount;
-    quotation.gstAmount = amounts.gstAmount;
-    quotation.totalAmount = amounts.totalAmount;
+    const gstPercent = Number(quotationData.gstPercent || 0);
+    const amounts = deriveAmounts(quotationData.amount, quotationData.quotationType, gstPercent);
+    quotationData.amount = amounts.amount;
+    quotationData.gstAmount = amounts.gstAmount;
+    quotationData.totalAmount = amounts.totalAmount;
 
-    const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
-    quotation.paymentStatus = paymentState.paymentStatus;
-    quotation.balanceDue = paymentState.balanceDue;
+    quotationData.quotationNumber = generateQuotationNumber();
+    quotationData.amountPaid = 0;
+    quotationData.paidAt = null;
+    quotationData.paymentProvider = "razorpay";
+    quotationData.paymentLinkId = "";
+    quotationData.paymentLinkUrl = "";
+    quotationData.paymentLinkedAt = null;
+    const paymentState = derivePaymentState(quotationData.totalAmount, quotationData.amountPaid);
+    quotationData.paymentStatus = paymentState.paymentStatus;
+    quotationData.balanceDue = paymentState.balanceDue;
+    quotationData.reviewed = true;
+    quotationData.reviewedAt = new Date();
+    quotationData.sent = false;
+    quotationData.sentAt = null;
 
-    const hasFinancialChange =
-      Number(quotation.amount || 0) !== previousAmount ||
-      quotation.quotationType !== previousQuotationType ||
-      Number(quotation.gstPercent || 0) !== previousGstPercent;
-
-    if (hasFinancialChange) {
-      quotation.paymentLinkId = "";
-      quotation.paymentLinkUrl = "";
-      quotation.paymentLinkedAt = null;
-      quotation.sent = false;
-      quotation.sentAt = null;
-    }
-
-    quotation.reviewed = true;
-    quotation.reviewedAt = new Date();
-
-    await quotation.save();
-    res.json(quotation);
+    const newQuotationVersion = await Quotation.create(quotationData);
+    return res.status(201).json(newQuotationVersion);
   } catch (err) {
     console.error("[QUOTATION] Update failed:", err?.message || err);
     res.status(500).json({ message: "Failed to update quotation" });
