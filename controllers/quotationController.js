@@ -332,12 +332,7 @@ export const updateQuotation = async (req, res) => {
     }
 
     if (!hasAnyChange) {
-      // No changes to quotation fields, but we still want to allow fresh payment link generation
-      // So we clear the old payment link so a new one can be generated on next send
-      existingQuotation.paymentLinkUrl = "";
-      existingQuotation.paymentLinkId = "";
-      await existingQuotation.save();
-      return res.json(existingQuotation);
+      console.log("[QUOTATION] No field changes detected; creating a new version anyway as requested");
     }
 
     if (!["with-gst", "without-gst"].includes(quotationData.quotationType)) {
