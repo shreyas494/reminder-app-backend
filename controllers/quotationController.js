@@ -482,11 +482,23 @@ export const generateQuotationPaymentLink = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
-    console.log(`[PAYMENT LINK] Quotation found:`, {
+    // Validate required fields
+    const requiredFields = ['totalAmount', 'clientEmail', 'recipientName'];
+    const missingFields = requiredFields.filter(field => !quotation[field]);
+    if (missingFields.length > 0) {
+      const errMsg = `Quotation missing required fields: ${missingFields.join(', ')}`;
+      console.error(`[PAYMENT LINK] Validation failed:`, errMsg);
+      return res.status(400).json({ message: errMsg });
+    }
+
+    console.log(`[PAYMENT LINK] Quotation validation passed:`, {
       id: quotation._id,
       amount: quotation.totalAmount,
       amountPaid: quotation.amountPaid,
-      reminderRef: quotation.reminder,
+      email: quotation.clientEmail,
+      name: quotation.recipientName,
+      reminderRef: quotation.reminder ? "yes" : "no",
+      quotationNumber: quotation.quotationNumber,
       existingPaymentLinkUrl: quotation.paymentLinkUrl ? "yes" : "no",
     });
 
@@ -496,22 +508,22 @@ export const generateQuotationPaymentLink = async (req, res) => {
         reminder = await Reminder.findById(quotation.reminder).lean();
         console.log(`[PAYMENT LINK] Reminder found:`, {
           reminderId: reminder?._id,
-          mobile1: reminder?.mobile1,
-          mobile2: reminder?.mobile2,
+          mobile1: reminder?.mobile1 ? "yes" : "no",
+          mobile2: reminder?.mobile2 ? "yes" : "no",
         });
       } catch (reminderErr) {
         console.error(`[PAYMENT LINK] Error fetching reminder:`, reminderErr?.message);
         reminder = null;
       }
     } else {
-      console.log(`[PAYMENT LINK] Quotation has no reminder reference`);
+      console.log(`[PAYMENT LINK] Quotation has no reminder reference (old quotation from history)`);
     }
 
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
     quotation.paymentStatus = paymentState.paymentStatus;
     quotation.balanceDue = paymentState.balanceDue;
 
-    console.log(`[PAYMENT LINK] Payment state:`, {
+    console.log(`[PAYMENT LINK] Calculated payment state:`, {
       totalAmount: quotation.totalAmount,
       amountPaid: quotation.amountPaid,
       balanceDue: quotation.balanceDue,
@@ -523,7 +535,7 @@ export const generateQuotationPaymentLink = async (req, res) => {
       quotation.paymentLinkUrl = "";
       quotation.paymentLinkId = "";
       await quotation.save();
-      console.log(`[PAYMENT LINK] No payment due - returning empty link`);
+      console.log(`[PAYMENT LINK] No payment due (amount paid already covers total)`);
       return res.json({
         message: "No payment due",
         paymentLinkUrl: "",
