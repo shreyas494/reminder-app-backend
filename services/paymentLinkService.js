@@ -85,18 +85,36 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
   try {
     const response = await razorpay.paymentLink.create(payload);
 
+    console.log("[PAYMENT LINK] Razorpay response received:", {
+      hasResponse: !!response,
+      id: response?.id,
+      status: response?.status,
+      short_url: response?.short_url,
+      url: response?.url,
+      allKeys: response ? Object.keys(response) : [],
+    });
+
     if (!response || !response.id) {
       throw new Error("Invalid Razorpay response: missing payment link ID");
     }
 
-    if (!response.short_url) {
-      throw new Error("Invalid Razorpay response: missing short URL");
+    // Use short_url if available, fall back to url
+    const shortUrl = response.short_url || response.url;
+    if (!shortUrl) {
+      console.error("[PAYMENT LINK] Missing URL in response:", {
+        responseSummary: {
+          id: response.id,
+          status: response.status,
+          keys: Object.keys(response).slice(0, 20),
+        },
+      });
+      throw new Error("Invalid Razorpay response: missing payment link URL (neither short_url nor url available)");
     }
 
     return {
       id: response.id,
       status: response.status,
-      shortUrl: response.short_url,
+      shortUrl: shortUrl,
       raw: response,
     };
   } catch (err) {
@@ -105,7 +123,8 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
       description: err?.description,
       code: err?.code,
       statusCode: err?.statusCode,
-      payload: { ...payload, reference_id: "***" }, // Mask reference for privacy
+      error: err?.error,
+      fullError: err,
     });
     throw err;
   }

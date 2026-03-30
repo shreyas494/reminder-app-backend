@@ -500,11 +500,18 @@ export const generateQuotationPaymentLink = async (req, res) => {
 
     while (retries < maxRetries) {
       try {
+        console.log(`[PAYMENT LINK GENERATION] Attempt ${retries + 1}/${maxRetries}`);
         paymentLink = await createPaymentLinkForQuotation({
           quotation,
           clientName: quotation.recipientName,
           clientEmail: quotation.clientEmail,
           clientPhone: reminder?.mobile1 || reminder?.mobile2,
+        });
+
+        console.log("[PAYMENT LINK GENERATION] Payment link response received:", {
+          id: paymentLink?.id,
+          shortUrl: paymentLink?.shortUrl,
+          status: paymentLink?.status,
         });
 
         if (paymentLink && paymentLink.id && paymentLink.shortUrl) {
@@ -514,6 +521,7 @@ export const generateQuotationPaymentLink = async (req, res) => {
         }
       } catch (err) {
         retries++;
+        console.error(`[PAYMENT LINK GENERATION] Attempt ${retries}/${maxRetries} failed:`, err?.message);
         if (retries >= maxRetries) {
           throw err;
         }
@@ -531,6 +539,11 @@ export const generateQuotationPaymentLink = async (req, res) => {
     quotation.paymentLinkUrl = paymentLink.shortUrl;
     quotation.paymentLinkedAt = new Date();
     await quotation.save();
+
+    console.log("[PAYMENT LINK GENERATION] Saving and returning to frontend:", {
+      paymentLinkUrl: quotation.paymentLinkUrl,
+      paymentLinkId: quotation.paymentLinkId,
+    });
 
     res.json({
       message: "Payment link generated",
