@@ -6,8 +6,11 @@ const hasRazorpayConfig = () =>
 
 const getRazorpayClient = () => {
   if (!hasRazorpayConfig()) {
+    console.error("[RAZORPAY CONFIG] Missing configuration - RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set");
     return null;
   }
+
+  console.log("[RAZORPAY CONFIG] Razorpay configured with key ID:", process.env.RAZORPAY_KEY_ID?.substring(0, 15) + "...");
 
   return new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -42,10 +45,13 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
 
   const callbackUrl = process.env.PAYMENT_CALLBACK_URL || undefined;
 
+  const referenceId = buildUniqueReferenceId(quotation);
+  console.log("[PAYMENT LINK] Building payload with reference_id:", referenceId);
+
   const payload = {
     amount: amountInPaise,
     currency: "INR",
-    reference_id: buildUniqueReferenceId(quotation),
+    reference_id: referenceId,
     description: `${quotation.subject || "Quotation Payment"} (${quotation.quotationNumber || quotation._id})`,
     notify: {
       sms: Boolean(clientPhone),
@@ -83,33 +89,45 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
   }
 
   try {
+    console.log("[PAYMENT LINK] Calling Razorpay API...");
     const response = await razorpay.paymentLink.create(payload);
 
-    console.log("[PAYMENT LINK] Razorpay response received:", {
-      hasResponse: !!response,
-      id: response?.id,
-      status: response?.status,
-      short_url: response?.short_url,
-      url: response?.url,
-      allKeys: response ? Object.keys(response) : [],
-    });
+    console.log("[PAYMENT LINK] API Response status:", response?.status);
+    console.log("[PAYMENT LINK] API Response keys:", Object.keys(response || {}));
+    console.log("[PAYMENT LINK] API Response full:", JSON.stringify(response, null, 2));
 
-    if (!response || !response.id) {
-      throw new Error("Invalid Razorpay response: missing payment link ID");
+    if (!response) {
+      const errMsg = "Razorpay returned null/undefined response";
+      console.error("[PAYMENT LINK] ERROR:", errMsg);
+      throw new Error(errMsg);
     }
 
-    // Use short_url if available, fall back to url
+    if (response.error) {
+      const errMsg = `Razorpay API Error: ${response.error?.description || response.error?.message || JSON.stringify(response.error)}`;
+      console.error("[PAYMENT LINK] ERROR:", errMsg);
+      throw new Error(errMsg);
+    }
+
+    if (!response.id) {
+      const errMsg = `Razorpay response missing payment link ID. Got keys: ${Object.keys(response).join(", ")}`;
+      console.error("[PAYMENT LINK] ERROR:", errMsg);
+      throw new Error(errMsg);
+    }
+
+    // Use short_url if available, fall back to url or id
     const shortUrl = response.short_url || response.url;
     if (!shortUrl) {
-      console.error("[PAYMENT LINK] Missing URL in response:", {
-        responseSummary: {
-          id: response.id,
-          status: response.status,
-          keys: Object.keys(response).slice(0, 20),
-        },
-      });
-      throw new Error("Invalid Razorpay response: missing payment link URL (neither short_url nor url available)");
+      const errMsg = `Razorpay response missing both short_url and url. ID: ${response.id}, Keys: ${Object.keys(response).join(", ")}`;
+      console.error("[PAYMENT LINK] ERROR:", errMsg);
+      console.error("[PAYMENT LINK] Full response:", JSON.stringify(response, null, 2));
+      throw new Error(errMsg);
     }
+
+    console.log("[PAYMENT LINK] SUCCESS - Created link:", {
+      id: response.id,
+      shortUrl: shortUrl,
+      status: response.status,
+    });
 
     return {
       id: response.id,
@@ -118,13 +136,13 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
       raw: response,
     };
   } catch (err) {
-    console.error("[PAYMENT LINK] Razorpay API error:", {
+    console.error("[PAYMENT LINK] CATCH BLOCK - Exception during API call:", {
+      type: err?.constructor?.name,
       message: err?.message,
-      description: err?.description,
       code: err?.code,
       statusCode: err?.statusCode,
-      error: err?.error,
-      fullError: err,
+      description: err?.description,
+      fullError: JSON.stringify(err, null, 2),
     });
     throw err;
   }
