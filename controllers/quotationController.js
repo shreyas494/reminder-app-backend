@@ -494,12 +494,37 @@ export const generateQuotationPaymentLink = async (req, res) => {
       });
     }
 
-    const paymentLink = await createPaymentLinkForQuotation({
-      quotation,
-      clientName: quotation.recipientName,
-      clientEmail: quotation.clientEmail,
-      clientPhone: reminder?.mobile1 || reminder?.mobile2,
-    });
+    let paymentLink;
+    let retries = 0;
+    const maxRetries = 2;
+
+    while (retries < maxRetries) {
+      try {
+        paymentLink = await createPaymentLinkForQuotation({
+          quotation,
+          clientName: quotation.recipientName,
+          clientEmail: quotation.clientEmail,
+          clientPhone: reminder?.mobile1 || reminder?.mobile2,
+        });
+
+        if (paymentLink && paymentLink.id && paymentLink.shortUrl) {
+          break; // Success
+        } else {
+          throw new Error("Invalid payment link response from Razorpay");
+        }
+      } catch (err) {
+        retries++;
+        if (retries >= maxRetries) {
+          throw err;
+        }
+        // Wait 500ms before retry
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    if (!paymentLink || !paymentLink.id || !paymentLink.shortUrl) {
+      throw new Error("Failed to generate valid payment link after retries");
+    }
 
     quotation.paymentProvider = "razorpay";
     quotation.paymentLinkId = paymentLink.id;
@@ -514,8 +539,14 @@ export const generateQuotationPaymentLink = async (req, res) => {
       quotation,
     });
   } catch (err) {
-    console.error("[QUOTATION] Payment link generation failed:", err?.message || err);
-    res.status(500).json({ message: err?.message || "Failed to generate payment link" });
+    console.error("[QUOTATION] Payment link generation failed:", {
+      quotationId: req.params.id,
+      error: err?.message || err,
+      razorpayError: err?.description || err?.code,
+    });
+    res.status(500).json({
+      message: err?.message || err?.description || "Failed to generate payment link",
+    });
   }
 };
 
