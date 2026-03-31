@@ -6,11 +6,8 @@ const hasRazorpayConfig = () =>
 
 const getRazorpayClient = () => {
   if (!hasRazorpayConfig()) {
-    console.error("[RAZORPAY CONFIG] Missing configuration - RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET not set");
     return null;
   }
-
-  console.log("[RAZORPAY CONFIG] Razorpay configured with key ID:", process.env.RAZORPAY_KEY_ID?.substring(0, 15) + "...");
 
   return new Razorpay({
     key_id: process.env.RAZORPAY_KEY_ID,
@@ -46,7 +43,6 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
   const callbackUrl = process.env.PAYMENT_CALLBACK_URL || undefined;
 
   const referenceId = buildUniqueReferenceId(quotation);
-  console.log("[PAYMENT LINK] Building payload with reference_id:", referenceId);
 
   const payload = {
     amount: amountInPaise,
@@ -89,12 +85,7 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
   }
 
   try {
-    console.log("[PAYMENT LINK] Calling Razorpay API...");
     const response = await razorpay.paymentLink.create(payload);
-
-    console.log("[PAYMENT LINK] API Response status:", response?.status);
-    console.log("[PAYMENT LINK] API Response keys:", Object.keys(response || {}));
-    console.log("[PAYMENT LINK] API Response full:", JSON.stringify(response, null, 2));
 
     if (!response) {
       const errMsg = "Razorpay returned null/undefined response";
@@ -123,11 +114,7 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
       throw new Error(errMsg);
     }
 
-    console.log("[PAYMENT LINK] SUCCESS - Created link:", {
-      id: response.id,
-      shortUrl: shortUrl,
-      status: response.status,
-    });
+
 
     return {
       id: response.id,
@@ -136,14 +123,6 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
       raw: response,
     };
   } catch (err) {
-    console.error("[PAYMENT LINK] CATCH BLOCK - Exception during API call:", {
-      type: err?.constructor?.name,
-      message: err?.message,
-      code: err?.code,
-      statusCode: err?.statusCode,
-      description: err?.description,
-      fullError: JSON.stringify(err, null, 2),
-    });
     throw err;
   }
 };

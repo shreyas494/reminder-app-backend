@@ -466,8 +466,6 @@ export const sendQuotation = async (req, res) => {
 
 export const generateQuotationPaymentLink = async (req, res) => {
   try {
-    console.log(`[PAYMENT LINK] Generating link for quotation ${req.params.id}`);
-    
     const quotation = await Quotation.findOne({
       _id: req.params.id,
       user: req.user.id,
@@ -477,60 +475,24 @@ export const generateQuotationPaymentLink = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
-    // Validate required fields
-    const requiredFields = ['totalAmount', 'clientEmail', 'recipientName'];
-    const missingFields = requiredFields.filter(field => !quotation[field]);
-    if (missingFields.length > 0) {
-      const errMsg = `Quotation missing required fields: ${missingFields.join(', ')}`;
-      console.error(`[PAYMENT LINK] Validation failed:`, errMsg);
-      return res.status(400).json({ message: errMsg });
-    }
-
-    console.log(`[PAYMENT LINK] Quotation validation passed:`, {
-      id: quotation._id,
-      amount: quotation.totalAmount,
-      amountPaid: quotation.amountPaid,
-      email: quotation.clientEmail,
-      name: quotation.recipientName,
-      reminderRef: quotation.reminder ? "yes" : "no",
-      quotationNumber: quotation.quotationNumber,
-      existingPaymentLinkUrl: quotation.paymentLinkUrl ? "yes" : "no",
-    });
-
     let reminder = null;
     if (quotation.reminder) {
       try {
         reminder = await Reminder.findById(quotation.reminder).lean();
-        console.log(`[PAYMENT LINK] Reminder found:`, {
-          reminderId: reminder?._id,
-          mobile1: reminder?.mobile1 ? "yes" : "no",
-          mobile2: reminder?.mobile2 ? "yes" : "no",
-        });
       } catch (reminderErr) {
-        console.error(`[PAYMENT LINK] Error fetching reminder:`, reminderErr?.message);
         reminder = null;
       }
-    } else {
-      console.log(`[PAYMENT LINK] Quotation has no reminder reference (old quotation from history)`);
     }
 
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
     quotation.paymentStatus = paymentState.paymentStatus;
     quotation.balanceDue = paymentState.balanceDue;
 
-    console.log(`[PAYMENT LINK] Calculated payment state:`, {
-      totalAmount: quotation.totalAmount,
-      amountPaid: quotation.amountPaid,
-      balanceDue: quotation.balanceDue,
-      paymentStatus: quotation.paymentStatus,
-    });
-
     const dueAmount = Number(quotation.balanceDue ?? quotation.totalAmount ?? 0);
     if (dueAmount <= 0) {
       quotation.paymentLinkUrl = "";
       quotation.paymentLinkId = "";
       await quotation.save();
-      console.log(`[PAYMENT LINK] No payment due (amount paid already covers total)`);
       return res.json({
         message: "No payment due",
         paymentLinkUrl: "",
@@ -545,25 +507,11 @@ export const generateQuotationPaymentLink = async (req, res) => {
 
     while (retries < maxRetries) {
       try {
-        console.log(`[PAYMENT LINK GENERATION] Attempt ${retries + 1}/${maxRetries}`);
-        console.log(`[PAYMENT LINK GENERATION] Creating link with:`, {
-          quotationId: quotation._id,
-          recipientName: quotation.recipientName,
-          clientEmail: quotation.clientEmail,
-          phone: reminder?.mobile1 || reminder?.mobile2 || "none",
-        });
-
         paymentLink = await createPaymentLinkForQuotation({
           quotation,
           clientName: quotation.recipientName,
           clientEmail: quotation.clientEmail,
-          clientPhone: reminder?.mobile1 || reminder?.mobile2, // Safe to be undefined
-        });
-
-        console.log("[PAYMENT LINK GENERATION] Payment link response received:", {
-          id: paymentLink?.id,
-          shortUrl: paymentLink?.shortUrl,
-          status: paymentLink?.status,
+          clientPhone: reminder?.mobile1 || reminder?.mobile2,
         });
 
         if (paymentLink && paymentLink.id && paymentLink.shortUrl) {
@@ -573,11 +521,9 @@ export const generateQuotationPaymentLink = async (req, res) => {
         }
       } catch (err) {
         retries++;
-        console.error(`[PAYMENT LINK GENERATION] Attempt ${retries}/${maxRetries} failed:`, err?.message);
         if (retries >= maxRetries) {
           throw err;
         }
-        // Wait 500ms before retry
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
@@ -592,11 +538,6 @@ export const generateQuotationPaymentLink = async (req, res) => {
     quotation.paymentLinkedAt = new Date();
     await quotation.save();
 
-    console.log("[PAYMENT LINK GENERATION] Saving and returning to frontend:", {
-      paymentLinkUrl: quotation.paymentLinkUrl,
-      paymentLinkId: quotation.paymentLinkId,
-    });
-
     res.json({
       message: "Payment link generated",
       paymentLinkUrl: quotation.paymentLinkUrl,
@@ -604,13 +545,8 @@ export const generateQuotationPaymentLink = async (req, res) => {
       quotation,
     });
   } catch (err) {
-    console.error("[QUOTATION] Payment link generation failed:", {
-      quotationId: req.params.id,
-      error: err?.message || err,
-      razorpayError: err?.description || err?.code,
-    });
     res.status(500).json({
-      message: err?.message || err?.description || "Failed to generate payment link",
+      message: err?.message || "Failed to generate payment link",
     });
   }
 };
