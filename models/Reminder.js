@@ -18,6 +18,12 @@ const reminderSchema = new mongoose.Schema(
     email: { type: String },
 
     projectName: { type: String, required: true },
+    serviceType: {
+      type: String,
+      enum: ["Domain,Hosting and SSL", "Domain", "Hosting and SSL", "Website maintenance"],
+      default: "Domain,Hosting and SSL",
+      required: true,
+    },
     domainName: { type: String },
 
     /* ================= DATES ================= */

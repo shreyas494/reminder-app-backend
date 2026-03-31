@@ -52,6 +52,50 @@ function toExpiryText(expiryDate) {
   });
 }
 
+const SERVICE_TYPE_OPTIONS = [
+  "Domain,Hosting and SSL",
+  "Domain",
+  "Hosting and SSL",
+  "Website maintenance",
+];
+
+function normalizeServiceType(serviceType) {
+  return SERVICE_TYPE_OPTIONS.includes(serviceType)
+    ? serviceType
+    : "Domain,Hosting and SSL";
+}
+
+function serviceLabelByType(serviceType) {
+  if (serviceType === "Domain,Hosting and SSL") return "Domain, Hosting and SSL";
+  return serviceType;
+}
+
+function subjectByServiceType(serviceType) {
+  switch (serviceType) {
+    case "Domain":
+      return "Domain Renewal Quotation";
+    case "Hosting and SSL":
+      return "Hosting and SSL Renewal Quotation";
+    case "Website maintenance":
+      return "Website Maintenance Quotation";
+    default:
+      return "Domain, Hosting and SSL Renewal Quotation";
+  }
+}
+
+function serviceDescriptionByType(serviceType) {
+  switch (serviceType) {
+    case "Domain":
+      return "Domain Renewal For 1 Year";
+    case "Hosting and SSL":
+      return "Hosting & SSL Certificate For 1 Year";
+    case "Website maintenance":
+      return "Website Maintenance Service For 1 Year";
+    default:
+      return "Domain, Hosting & SSL Renewal For 1 Year";
+  }
+}
+
 function deriveAmounts(amount, quotationType, gstPercent) {
   const baseAmount = Number(amount || 0);
   const shouldApplyGst = quotationType === "with-gst";
@@ -155,6 +199,10 @@ export const createQuotationFromReminder = async (req, res) => {
     const gstPercent = Number(process.env.QUOTATION_GST_PERCENT || 18);
     const amounts = deriveAmounts(reminder.amount, quotationType, gstPercent);
     const defaults = getCompanyDefaults();
+    const reminderServiceType = normalizeServiceType(reminder.serviceType);
+    const serviceLabel = serviceLabelByType(reminderServiceType);
+    const expiry = toExpiryText(reminder.expiryDate);
+    const projectLabel = reminder.domainName || reminder.projectName || "your website";
 
     const quotation = await Quotation.create({
       user: req.user.id,
@@ -167,15 +215,11 @@ export const createQuotationFromReminder = async (req, res) => {
       recipientName: reminder.clientName || reminder.contactPerson || "",
       recipientAddress: "",
 
-      subject: "Domain & Hosting Renewal Quotation",
+      subject: subjectByServiceType(reminderServiceType),
       introText:
-        `As per our discussion, sending you the quotation for the renewal of Domain, Hosting & SSL Service for ${
-          reminder.domainName || reminder.projectName || "your website"
-        }. The Domain, Hosting & SSL Service is going to expire on ${toExpiryText(
-          reminder.expiryDate
-        )}. Please check renewal plans listed below:`,
-      serviceDescription: "Hosting & SSL Certificate For 1 Year",
-      expiryText: toExpiryText(reminder.expiryDate),
+        `As per our discussion, sending you the quotation for ${serviceLabel} service renewal for ${projectLabel}. The service is going to expire on ${expiry}. Please check renewal plans listed below:`,
+      serviceDescription: serviceDescriptionByType(reminderServiceType),
+      expiryText: expiry,
       paymentTerms: "100% advance along with the Purchase Order.",
 
       amount: amounts.amount,

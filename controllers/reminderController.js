@@ -1,6 +1,19 @@
 import Reminder from "../models/Reminder.js";
 import { calculateRecurringStartAt } from "../utils/calculateRecurringStartAt.js";
 
+const REMINDER_SERVICE_TYPES = [
+  "Domain,Hosting and SSL",
+  "Domain",
+  "Hosting and SSL",
+  "Website maintenance",
+];
+
+function normalizeServiceType(serviceType) {
+  return REMINDER_SERVICE_TYPES.includes(serviceType)
+    ? serviceType
+    : "Domain,Hosting and SSL";
+}
+
 /* =====================================================
    CREATE REMINDER (UNCHANGED)
    ===================================================== */
@@ -13,6 +26,7 @@ export const createReminder = async (req, res) => {
       mobile2,
       email,
       projectName,
+      serviceType,
       domainName,
       activationDate,
       expiryDate,
@@ -53,6 +67,7 @@ export const createReminder = async (req, res) => {
       mobile2,
       email,
       projectName,
+      serviceType: normalizeServiceType(serviceType),
       domainName,
       activationDate: activation,
       expiryDate: expiry,
@@ -227,6 +242,7 @@ export const updateReminder = async (req, res) => {
       mobile2,
       email,
       projectName,
+      serviceType,
       domainName,
       amount,
       recurringEnabled,
@@ -243,6 +259,7 @@ export const updateReminder = async (req, res) => {
 
     if (email !== undefined) reminder.email = email;
     if (projectName !== undefined) reminder.projectName = projectName;
+    if (serviceType !== undefined) reminder.serviceType = normalizeServiceType(serviceType);
     if (domainName !== undefined) reminder.domainName = domainName;
     if (amount !== undefined) reminder.amount = amount;
 
