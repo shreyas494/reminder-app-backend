@@ -53,9 +53,22 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", uptime: process.uptime() });
 });
 
-/* ---------- PING (ultra-light keep-alive) ---------- */
-app.get("/api/ping", (req, res) => {
-  res.status(204).end();
+/* ---------- PING / KEEP-ALIVE (ultra-light) ---------- */
+const keepAliveHandler = (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("text/plain").status(200).send("ok");
+};
+
+app.get("/alive", keepAliveHandler);
+app.head("/alive", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).end();
+});
+
+app.get("/api/ping", keepAliveHandler);
+app.head("/api/ping", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).end();
 });
 
 /* ---------- ROUTES ---------- */
