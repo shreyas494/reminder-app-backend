@@ -65,6 +65,15 @@ app.head("/alive", (req, res) => {
   res.status(200).end();
 });
 
+app.get("/alive-204", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(204).end();
+});
+app.head("/alive-204", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(204).end();
+});
+
 app.get("/api/ping", keepAliveHandler);
 app.head("/api/ping", (req, res) => {
   res.setHeader("Cache-Control", "no-store");
