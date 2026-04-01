@@ -37,13 +37,19 @@ export const createReminder = async (req, res) => {
 
     if (
       !clientName ||
-      !contactPerson ||
       !mobile1 ||
       !projectName ||
       !activationDate ||
-      !expiryDate
+      !expiryDate ||
+      amount === undefined ||
+      amount === null ||
+      String(amount).trim() === ""
     ) {
       return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ message: "Amount must be greater than 0" });
     }
 
     const activation = new Date(activationDate);
@@ -62,7 +68,7 @@ export const createReminder = async (req, res) => {
     const reminder = await Reminder.create({
       user: req.user.id,
       clientName,
-      contactPerson,
+      contactPerson: String(contactPerson || "").trim() || clientName,
       mobile1,
       mobile2,
       email,
