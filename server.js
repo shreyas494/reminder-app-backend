@@ -13,6 +13,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import reminderRoutes from "./routes/reminderRoutes.js";
 import contactRoutes from "./routes/contacts.js";
 import quotationRoutes from "./routes/quotationRoutes.js";
+import serviceTypeRoutes from "./routes/serviceTypeRoutes.js";
 
 // Cron
 import "./cron/reminderCron.js";
@@ -97,6 +98,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/reminders", reminderRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/quotations", quotationRoutes);
+app.use("/api/service-types", serviceTypeRoutes);
 
 /* ---------- SERVER ---------- */
 const PORT = process.env.PORT || 5000;
