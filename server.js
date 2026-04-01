@@ -50,7 +50,18 @@ app.use("/assets", express.static(path.join(__dirname, "public")));
 
 /* ---------- HEALTH (keep-alive ping) ---------- */
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", uptime: process.uptime() });
+  const states = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    dbState: states[mongoose.connection.readyState] || "unknown",
+  });
 });
 
 /* ---------- PING / KEEP-ALIVE (ultra-light) ---------- */
@@ -87,17 +98,31 @@ app.use("/api/reminders", reminderRoutes);
 app.use("/api/contacts", contactRoutes);
 app.use("/api/quotations", quotationRoutes);
 
-/* ---------- DB ---------- */
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => {
-    console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
-  });
-
 /* ---------- SERVER ---------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+/* ---------- DB ---------- */
+const connectWithRetry = async () => {
+  if (!process.env.MONGO_URI) {
+    console.error("❌ MONGO_URI is not configured");
+    return;
+  }
+
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ MongoDB connected");
+  } catch (err) {
+    console.error("❌ MongoDB connection failed:", err.message);
+    setTimeout(connectWithRetry, 15000);
+  }
+};
+
+mongoose.connection.on("disconnected", () => {
+  console.warn("⚠️ MongoDB disconnected. Retrying...");
+  setTimeout(connectWithRetry, 15000);
+});
+
+connectWithRetry();
