@@ -50,8 +50,8 @@ export const createPaymentLinkForQuotation = async ({ quotation, clientName, cli
     reference_id: referenceId,
     description: `${quotation.subject || "Quotation Payment"} (${quotation.quotationNumber || quotation._id})`,
     notify: {
-      sms: Boolean(clientPhone),
-      email: Boolean(clientEmail),
+      sms: false,
+      email: false,
     },
     reminder_enable: true,
     notes: {

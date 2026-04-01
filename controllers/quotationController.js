@@ -1,4 +1,5 @@
 import Quotation from "../models/Quotation.js";
+import Counter from "../models/Counter.js";
 import Reminder from "../models/Reminder.js";
 import { sendEmail } from "../services/emailService.js";
 import {
@@ -7,11 +8,26 @@ import {
 import { buildQuotationPdfBuffer } from "../services/quotationPdfService.js";
 import { createPaymentLinkForQuotation, fetchPaymentLinkDetails } from "../services/paymentLinkService.js";
 
-function generateQuotationNumber() {
-  const prefix = process.env.QUOTATION_PREFIX || "QTN";
-  const timestamp = Date.now().toString().slice(-8);
-  const random = Math.floor(100 + Math.random() * 900);
-  return `${prefix}-${timestamp}-${random}`;
+function getQuotationSeriesConfig(quotationType) {
+  const isGst = quotationType === "with-gst";
+  return {
+    counterName: isGst ? "quotation-number-gst" : "quotation-number-non-gst",
+    prefix: isGst
+      ? (process.env.QUOTATION_PREFIX_GST || process.env.QUOTATION_PREFIX || "GST-QTN")
+      : (process.env.QUOTATION_PREFIX_NON_GST || process.env.QUOTATION_PREFIX || "NGST-QTN"),
+  };
+}
+
+async function generateQuotationNumber(quotationType) {
+  const { counterName, prefix } = getQuotationSeriesConfig(quotationType);
+  const counter = await Counter.findOneAndUpdate(
+    { name: counterName },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+
+  const seq = Number(counter?.seq || 1);
+  return `${prefix}-${String(seq).padStart(4, "0")}`;
 }
 
 const FALLBACK_LOGO_URL = "https://reminder-app-backend-u8wb.onrender.com/assets/company-logo.png";
@@ -203,11 +219,12 @@ export const createQuotationFromReminder = async (req, res) => {
     const serviceLabel = serviceLabelByType(reminderServiceType);
     const expiry = toExpiryText(reminder.expiryDate);
     const projectLabel = reminder.domainName || reminder.projectName || "your website";
+    const quotationNumber = await generateQuotationNumber(quotationType);
 
     const quotation = await Quotation.create({
       user: req.user.id,
       reminder: reminder._id,
-      quotationNumber: generateQuotationNumber(),
+      quotationNumber,
       quotationType,
       quotationDate: new Date(),
 
@@ -256,10 +273,14 @@ export const getQuotations = async (req, res) => {
     const limit = 10;
     const skip = (page - 1) * limit;
     const statusFilter = String(req.query.status || "").trim().toLowerCase();
+    const typeFilter = String(req.query.quotationType || req.query.type || "").trim().toLowerCase();
 
     const query = { user: req.user.id };
     if (["paid", "unpaid", "partial", "failed", "expired"].includes(statusFilter)) {
       query.paymentStatus = statusFilter;
+    }
+    if (["with-gst", "without-gst"].includes(typeFilter)) {
+      query.quotationType = typeFilter;
     }
 
     const candidatesForSync = await Quotation.find({
@@ -389,7 +410,7 @@ export const updateQuotation = async (req, res) => {
     quotationData.gstAmount = amounts.gstAmount;
     quotationData.totalAmount = amounts.totalAmount;
 
-    quotationData.quotationNumber = generateQuotationNumber();
+    quotationData.quotationNumber = await generateQuotationNumber(quotationData.quotationType);
     quotationData.amountPaid = 0;
     quotationData.paidAt = null;
     quotationData.paymentProvider = "razorpay";
