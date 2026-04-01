@@ -79,4 +79,7 @@ const reminderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+reminderSchema.index({ user: 1, expiryDate: 1 });
+reminderSchema.index({ user: 1, status: 1 });
+
 export default mongoose.model("Reminder", reminderSchema);

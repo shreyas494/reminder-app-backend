@@ -137,10 +137,10 @@ export const getReminders = async (req, res) => {
    READ NEAR-EXPIRY REMINDERS (NEXT 30 DAYS)
    ===================================================== */
 export const getNearExpiryReminders = async (req, res) => {
-  await Reminder.updateMany(
-    { expiryDate: { $lt: new Date() }, status: "active" },
+  Reminder.updateMany(
+    { user: req.user.id, expiryDate: { $lt: new Date() }, status: "active" },
     { $set: { status: "expired" } }
-  );
+  ).catch(() => {});
 
   const page = Number(req.query.page) || 1;
   const limit = 10;
@@ -160,6 +160,8 @@ export const getNearExpiryReminders = async (req, res) => {
 
   const [data, total] = await Promise.all([
     Reminder.find(query)
+      .select("clientName contactPerson mobile1 mobile2 email projectName domainName expiryDate amount renewals")
+      .lean()
       .sort({ expiryDate: 1 })
       .skip(skip)
       .limit(limit),
