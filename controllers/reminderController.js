@@ -1,17 +1,11 @@
 import Reminder from "../models/Reminder.js";
 import { calculateRecurringStartAt } from "../utils/calculateRecurringStartAt.js";
 
-const REMINDER_SERVICE_TYPES = [
-  "Domain,Hosting and SSL",
-  "Domain",
-  "Hosting and SSL",
-  "Website maintenance",
-];
+const DEFAULT_SERVICE_TYPE = "Domain,Hosting and SSL";
 
 function normalizeServiceType(serviceType) {
-  return REMINDER_SERVICE_TYPES.includes(serviceType)
-    ? serviceType
-    : "Domain,Hosting and SSL";
+  const value = String(serviceType || "").trim();
+  return value || DEFAULT_SERVICE_TYPE;
 }
 
 /* =====================================================

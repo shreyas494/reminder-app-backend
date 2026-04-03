@@ -20,8 +20,7 @@ const reminderSchema = new mongoose.Schema(
     projectName: { type: String, required: true },
     serviceType: {
       type: String,
-      enum: ["Domain,Hosting and SSL", "Domain", "Hosting and SSL", "Website maintenance"],
-      default: "Domain,Hosting and SSL",
+      trim: true,
       required: true,
     },
     domainName: { type: String },

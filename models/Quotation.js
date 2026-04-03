@@ -22,6 +22,7 @@ const quotationSchema = new mongoose.Schema(
       enum: ["with-gst", "without-gst"],
       default: "with-gst",
     },
+    serviceType: { type: String, default: "" },
     quotationDate: {
       type: Date,
       default: Date.now,

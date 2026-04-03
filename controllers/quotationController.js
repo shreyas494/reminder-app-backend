@@ -68,17 +68,9 @@ function toExpiryText(expiryDate) {
   });
 }
 
-const SERVICE_TYPE_OPTIONS = [
-  "Domain,Hosting and SSL",
-  "Domain",
-  "Hosting and SSL",
-  "Website maintenance",
-];
-
 function normalizeServiceType(serviceType) {
-  return SERVICE_TYPE_OPTIONS.includes(serviceType)
-    ? serviceType
-    : "Domain,Hosting and SSL";
+  const value = String(serviceType || "").trim();
+  return value || "Domain,Hosting and SSL";
 }
 
 function serviceLabelByType(serviceType) {
@@ -95,7 +87,7 @@ function subjectByServiceType(serviceType) {
     case "Website maintenance":
       return "Website Maintenance Quotation";
     default:
-      return "Domain, Hosting and SSL Renewal Quotation";
+      return `${serviceType || "Service"} Renewal Quotation`;
   }
 }
 
@@ -108,8 +100,13 @@ function serviceDescriptionByType(serviceType) {
     case "Website maintenance":
       return "Website Maintenance Service For 1 Year";
     default:
-      return "Domain, Hosting & SSL Renewal For 1 Year";
+      return `${serviceType || "Service"} Renewal For 1 Year`;
   }
+}
+
+function buildIntroText(serviceType, projectLabel, expiry) {
+  const serviceLabel = serviceLabelByType(serviceType);
+  return `As per our discussion, sending you the quotation for ${serviceLabel} service renewal for ${projectLabel}. The service is going to expire on ${expiry}. Please check renewal plans listed below:`;
 }
 
 function deriveAmounts(amount, quotationType, gstPercent) {
@@ -216,7 +213,6 @@ export const createQuotationFromReminder = async (req, res) => {
     const amounts = deriveAmounts(reminder.amount, quotationType, gstPercent);
     const defaults = getCompanyDefaults();
     const reminderServiceType = normalizeServiceType(reminder.serviceType);
-    const serviceLabel = serviceLabelByType(reminderServiceType);
     const expiry = toExpiryText(reminder.expiryDate);
     const projectLabel = reminder.domainName || reminder.projectName || "your website";
     const quotationNumber = await generateQuotationNumber(quotationType);
@@ -226,6 +222,7 @@ export const createQuotationFromReminder = async (req, res) => {
       reminder: reminder._id,
       quotationNumber,
       quotationType,
+      serviceType: reminderServiceType,
       quotationDate: new Date(),
 
       clientEmail: reminder.email || "",
@@ -233,8 +230,7 @@ export const createQuotationFromReminder = async (req, res) => {
       recipientAddress: "",
 
       subject: subjectByServiceType(reminderServiceType),
-      introText:
-        `As per our discussion, sending you the quotation for ${serviceLabel} service renewal for ${projectLabel}. The service is going to expire on ${expiry}. Please check renewal plans listed below:`,
+      introText: buildIntroText(reminderServiceType, projectLabel, expiry),
       serviceDescription: serviceDescriptionByType(reminderServiceType),
       expiryText: expiry,
       paymentTerms: "100% advance along with the Purchase Order.",
@@ -357,6 +353,7 @@ export const updateQuotation = async (req, res) => {
 
     const allowedFields = [
       "quotationType",
+      "serviceType",
       "quotationDate",
       "clientEmail",
       "recipientName",
@@ -403,6 +400,10 @@ export const updateQuotation = async (req, res) => {
     if (!["with-gst", "without-gst"].includes(quotationData.quotationType)) {
       return res.status(400).json({ message: "Invalid quotation type" });
     }
+
+    quotationData.serviceType = normalizeServiceType(quotationData.serviceType);
+    quotationData.subject = subjectByServiceType(quotationData.serviceType);
+    quotationData.serviceDescription = serviceDescriptionByType(quotationData.serviceType);
 
     const gstPercent = Number(quotationData.gstPercent || 0);
     const amounts = deriveAmounts(quotationData.amount, quotationData.quotationType, gstPercent);
