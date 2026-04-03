@@ -28,7 +28,7 @@ export const sendEmail = async ({ to, subject, text, html, attachments = [] }) =
     nextEmailAllowedAt = Date.now() + MIN_EMAIL_INTERVAL_MS;
 
     const payload = {
-      from: `Reminder App <${process.env.EMAIL_FROM}>`,
+      from: `SubTrackr <${process.env.EMAIL_FROM}>`,
       to,
       subject,
     };
