@@ -11,89 +11,90 @@ function formatDate(dateValue) {
 
 export function buildBillPreviewHtml(bill) {
   const showGst = bill.billType === "with-gst";
+  const subtotal = Number(bill.amount || 0);
+  const taxable = showGst ? subtotal : 0;
+  const taxRate = showGst ? `${Number(bill.gstPercent || 0).toFixed(2)}%` : "-";
+  const taxDue = showGst ? Number(bill.gstAmount || 0) : 0;
+  const total = Number(bill.totalAmount || 0);
 
   return `
-  <div style="max-width:760px;margin:0 auto;background:#ffffff;color:#111827;font-family:Arial,sans-serif;line-height:1.45;border:1px solid #dbe3ef;">
-    <div style="background:linear-gradient(130deg,#0f2c5c 0%,#1d4f91 100%);padding:16px 18px;display:flex;justify-content:space-between;align-items:flex-start;">
-      <div style="display:flex;align-items:flex-start;gap:12px;">
-        ${bill.companyLogoUrl ? `<img src="${bill.companyLogoUrl}" alt="logo" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:4px;padding:3px;"/>` : ""}
+  <div style="max-width:760px;margin:0 auto;background:#ececec;color:#111827;font-family:Arial,sans-serif;line-height:1.4;padding:18px 16px;border:1px solid #d0d0d0;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:14px;">
+      <div style="display:flex;align-items:flex-start;gap:10px;">
+        ${bill.companyLogoUrl ? `<div style="width:62px;height:46px;background:#fff;border:1px solid #d3d8e7;display:flex;align-items:center;justify-content:center;"><img src="${bill.companyLogoUrl}" alt="logo" style="max-width:56px;max-height:40px;object-fit:contain;"/></div>` : ""}
         <div>
-          <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.2;">${bill.companyName}</div>
-          <div style="font-size:11px;color:#d1ddf2;margin-top:4px;max-width:360px;">${bill.companyAddress}</div>
-          ${bill.companyTagline ? `<div style="font-size:11px;color:#eaf1ff;font-weight:600;margin-top:4px;">${bill.companyTagline}</div>` : ""}
+          <div style="font-size:42px;font-weight:700;color:#1d3a7e;line-height:1;">${bill.companyName || "Company Name"}</div>
+          <div style="font-size:12px;color:#111827;margin-top:4px;white-space:pre-wrap;">${bill.companyAddress || ""}</div>
+          ${bill.companyPhone ? `<div style="font-size:12px;color:#111827;margin-top:2px;">Phone: ${bill.companyPhone}</div>` : ""}
         </div>
       </div>
-      <div style="text-align:right;min-width:130px;">
-        <div style="font-size:24px;font-weight:700;color:#ffffff;letter-spacing:0.5px;">BILL</div>
-        <div style="font-size:11px;color:#d1ddf2;margin-top:6px;">No: ${bill.billNumber || "-"}</div>
-        <div style="font-size:11px;color:#d1ddf2;margin-top:2px;">Date: ${formatDate(bill.billDate)}</div>
+      <div style="min-width:220px;text-align:right;">
+        <div style="font-size:52px;font-weight:700;color:#7189c8;line-height:0.95;">INVOICE</div>
+        <div style="margin-top:8px;display:grid;grid-template-columns:90px 1fr;gap:2px;font-size:11px;align-items:center;">
+          <div>DATE</div><div style="background:#dfe5f4;border:1px solid #7989b8;padding:3px 6px;text-align:center;">${formatDate(bill.billDate)}</div>
+          <div>INVOICE #</div><div style="background:#dfe5f4;border:1px solid #7989b8;padding:3px 6px;text-align:center;">${bill.billNumber || "-"}</div>
+          <div>CUSTOMER ID</div><div style="background:#dfe5f4;border:1px solid #7989b8;padding:3px 6px;text-align:center;">${bill.clientEmail || "-"}</div>
+          <div>DUE DATE</div><div style="background:#dfe5f4;border:1px solid #7989b8;padding:3px 6px;text-align:center;">${formatDate(bill.billDate)}</div>
+        </div>
       </div>
     </div>
 
-    <div style="padding:14px 18px 0;display:grid;grid-template-columns:1fr 1fr;gap:16px;">
-      <div style="border-top:2px solid #e3ebf8;padding-top:8px;">
-        <div style="font-size:11px;font-weight:700;color:#375b91;text-transform:uppercase;">Bill To</div>
-        <div style="font-size:12px;font-weight:700;margin-top:5px;">${bill.recipientName || ""}</div>
-        ${bill.recipientAddress ? `<div style="font-size:11px;color:#4b5563;margin-top:3px;white-space:pre-wrap;">${bill.recipientAddress}</div>` : ""}
-      </div>
-      <div style="border-top:2px solid #e3ebf8;padding-top:8px;">
-        <div style="font-size:11px;font-weight:700;color:#375b91;text-transform:uppercase;">From</div>
-        <div style="font-size:12px;font-weight:700;margin-top:5px;">${bill.companyName}</div>
-        <div style="font-size:11px;color:#4b5563;margin-top:3px;">${bill.companyAddress}</div>
-        ${(bill.senderName || bill.senderPhone) ? `<div style="font-size:11px;color:#4b5563;margin-top:3px;">${[bill.senderName, bill.senderPhone].filter(Boolean).join(" · ")}</div>` : ""}
+    <div style="margin-top:18px;max-width:330px;">
+      <div style="background:#34498a;color:#fff;font-weight:700;font-size:14px;padding:4px 8px;">BILL TO</div>
+      <div style="padding:6px 8px 0;font-size:12px;white-space:pre-wrap;">
+        <div>${bill.recipientName || ""}</div>
+        <div>${bill.recipientAddress || ""}</div>
       </div>
     </div>
 
-    <div style="padding:12px 18px 0;">
-      <div style="font-size:14px;font-weight:700;color:#0f2c5c;">${bill.subject}</div>
-      <p style="font-size:11px;color:#4b5563;margin:8px 0 0;white-space:pre-wrap;">${bill.introText}</p>
-    </div>
-
-    <div style="padding:12px 18px 0;">
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+    <div style="margin-top:14px;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
         <thead>
           <tr>
-            <th style="background:#173a73;color:#fff;border:1px solid #c9d7ee;padding:8px;text-align:left;width:52px;">No.</th>
-            <th style="background:#173a73;color:#fff;border:1px solid #c9d7ee;padding:8px;text-align:left;">Description</th>
-            <th style="background:#173a73;color:#fff;border:1px solid #c9d7ee;padding:8px;text-align:right;width:150px;">Amount</th>
+            <th style="background:#34498a;color:#fff;border:1px solid #6f7fae;padding:5px 8px;text-align:center;">DESCRIPTION</th>
+            <th style="background:#34498a;color:#fff;border:1px solid #6f7fae;padding:5px 8px;text-align:center;width:56px;">TAXED</th>
+            <th style="background:#34498a;color:#fff;border:1px solid #6f7fae;padding:5px 8px;text-align:center;width:150px;">AMOUNT</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td style="border:1px solid #c9d7ee;padding:8px;">1</td>
-            <td style="border:1px solid #c9d7ee;padding:8px;">${bill.serviceDescription}</td>
-            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;">${formatCurrency(bill.amount)}</td>
+            <td style="border:1px solid #8d8d8d;padding:6px 8px;background:#f4f4f4;">${bill.serviceDescription}</td>
+            <td style="border:1px solid #8d8d8d;padding:6px 8px;background:#f4f4f4;text-align:center;">${showGst ? "X" : ""}</td>
+            <td style="border:1px solid #8d8d8d;padding:6px 8px;background:#f4f4f4;text-align:right;">${formatCurrency(bill.amount)}</td>
           </tr>
-          ${showGst ? `<tr>
-            <td style="border:1px solid #c9d7ee;padding:8px;"></td>
-            <td style="border:1px solid #c9d7ee;padding:8px;">GST (${bill.gstPercent}%)</td>
-            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;">${formatCurrency(bill.gstAmount)}</td>
-          </tr>` : ""}
-          <tr>
-            <td style="border:1px solid #c9d7ee;padding:8px;"></td>
-            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;font-weight:700;background:#f1f6ff;">Total</td>
-            <td style="border:1px solid #c9d7ee;padding:8px;text-align:right;font-weight:700;background:#f1f6ff;">${formatCurrency(bill.totalAmount)}</td>
-          </tr>
+          ${Array.from({ length: 12 }).map((_, idx) => `<tr>
+            <td style="border:1px solid #8d8d8d;padding:6px 8px;background:${idx % 2 === 0 ? "#efefef" : "#e7e7e7"};">&nbsp;</td>
+            <td style="border:1px solid #8d8d8d;padding:6px 8px;background:${idx % 2 === 0 ? "#efefef" : "#e7e7e7"};">&nbsp;</td>
+            <td style="border:1px solid #8d8d8d;padding:6px 8px;background:${idx % 2 === 0 ? "#efefef" : "#e7e7e7"};">&nbsp;</td>
+          </tr>`).join("")}
         </tbody>
       </table>
     </div>
 
-    <div style="padding:12px 18px 0;display:flex;justify-content:flex-end;">
-      <div style="background:#1d4f91;color:#fff;padding:8px 12px;font-size:11px;font-weight:700;border-radius:4px;min-width:220px;text-align:right;">
-        Amount Received: ${formatCurrency(bill.amountPaid || bill.totalAmount)}
+    <div style="margin-top:10px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+      <div style="width:64%;">
+        <div style="background:#34498a;color:#fff;font-weight:700;font-size:13px;padding:4px 8px;max-width:360px;">OTHER COMMENTS</div>
+        <div style="border:1px solid #a9a9a9;min-height:92px;padding:8px 10px;font-size:11px;">
+          <div>1. ${bill.paymentTerms || "Payment received successfully."}</div>
+          <div style="margin-top:4px;">2. Amount received: ${formatCurrency(bill.amountPaid || total)}</div>
+        </div>
+      </div>
+      <div style="width:36%;font-size:11px;">
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Subtotal</span><span>${formatCurrency(subtotal)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Taxable</span><span>${formatCurrency(taxable)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Tax rate</span><span>${taxRate}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Tax due</span><span>${formatCurrency(taxDue)}</span></div>
+        <div style="display:flex;justify-content:space-between;padding:2px 0;"><span>Other</span><span>-</span></div>
+        <div style="margin-top:4px;background:#dfe5f4;border:1px solid #7080af;padding:5px 8px;display:flex;justify-content:space-between;font-weight:700;font-size:14px;">
+          <span>TOTAL</span><span>${formatCurrency(total)}</span>
+        </div>
       </div>
     </div>
 
-    <div style="padding:12px 18px 0;font-size:11px;color:#4b5563;">
-      <div><strong>Payment:</strong> ${bill.paymentTerms}</div>
-      <div style="margin-top:5px;">This bill acknowledges receipt of payment.</div>
-    </div>
-
-    <div style="padding:18px 18px 16px;display:flex;justify-content:flex-end;align-items:flex-end;">
-      <div style="text-align:right;">
-        <div style="font-size:11px;color:#6b7280;">Authorized Signatory</div>
-        <div style="margin-top:18px;font-size:12px;font-weight:700;color:#111827;">${bill.senderName || bill.companyName}</div>
-      </div>
+    <div style="margin-top:18px;text-align:center;font-size:11px;color:#111827;">
+      <div>If you have any questions about this invoice, please contact</div>
+      <div style="margin-top:3px;">${[bill.senderName || bill.companyName, bill.senderPhone || bill.companyPhone, bill.clientEmail].filter(Boolean).join(", ")}</div>
+      <div style="margin-top:8px;font-size:30px;font-style:italic;font-weight:700;">Thank You For Your Business!</div>
     </div>
   </div>`;
 }
