@@ -85,6 +85,12 @@ app.head("/api/ping", (req, res) => {
   res.status(200).end();
 });
 
+app.get("/api/keep-alive", keepAliveHandler);
+app.head("/api/keep-alive", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).end();
+});
+
 /* ---------- ROUTES ---------- */
 registerApiRoutes(app);
 
