@@ -8,6 +8,67 @@ import {
 import { buildQuotationPdfBuffer } from "../services/quotationPdfService.js";
 import { createPaymentLinkForQuotation, fetchPaymentLinkDetails } from "../services/paymentLinkService.js";
 
+function createRequestTimingMeta(requestStartMs) {
+  const respondedAt = new Date();
+  return {
+    ingestedAt: new Date(requestStartMs).toISOString(),
+    respondedAt: respondedAt.toISOString(),
+    processingMs: respondedAt.getTime() - requestStartMs,
+  };
+}
+
+function roundTo(value, digits = 4) {
+  const factor = 10 ** digits;
+  return Math.round(Number(value || 0) * factor) / factor;
+}
+
+function buildBenchmarkMetrics({
+  requestStartMs,
+  mongoSaveMs = 0,
+  quoteCreationMs = 0,
+} = {}) {
+  const processingMs = Date.now() - Number(requestStartMs || Date.now());
+  return {
+    transactionIngestionMs: roundTo(processingMs, 3),
+    mongoRecordSavingSeconds: roundTo(mongoSaveMs / 1000, 4),
+    automatedQuoteCreationSeconds: roundTo(quoteCreationMs / 1000, 4),
+  };
+}
+
+function computeStats(values = []) {
+  const numericValues = values
+    .map((value) => Number(value))
+    .filter((value) => Number.isFinite(value) && value >= 0)
+    .sort((a, b) => a - b);
+
+  if (!numericValues.length) {
+    return {
+      count: 0,
+      avg: null,
+      p50: null,
+      p95: null,
+      max: null,
+    };
+  }
+
+  const percentileAt = (percentile) => {
+    if (numericValues.length === 1) return numericValues[0];
+    const position = Math.ceil((percentile / 100) * numericValues.length) - 1;
+    const safeIndex = Math.max(0, Math.min(numericValues.length - 1, position));
+    return numericValues[safeIndex];
+  };
+
+  const sum = numericValues.reduce((acc, value) => acc + value, 0);
+
+  return {
+    count: numericValues.length,
+    avg: roundTo(sum / numericValues.length, 4),
+    p50: roundTo(percentileAt(50), 4),
+    p95: roundTo(percentileAt(95), 4),
+    max: roundTo(numericValues[numericValues.length - 1], 4),
+  };
+}
+
 function getQuotationSeriesConfig(quotationType) {
   const isGst = quotationType === "with-gst";
   return {
@@ -196,17 +257,25 @@ async function syncQuotationPaymentStatus(quotation) {
 }
 
 export const createQuotationFromReminder = async (req, res) => {
+  const requestStartMs = Date.now();
+  const quoteStartHr = process.hrtime.bigint();
   try {
     const { reminderId } = req.params;
     const { quotationType = "with-gst" } = req.body;
 
     if (!["with-gst", "without-gst"].includes(quotationType)) {
-      return res.status(400).json({ message: "Invalid quotation type" });
+      return res.status(400).json({
+        message: "Invalid quotation type",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     const reminder = await Reminder.findOne({ _id: reminderId, user: req.user.id });
     if (!reminder) {
-      return res.status(404).json({ message: "Reminder not found" });
+      return res.status(404).json({
+        message: "Reminder not found",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     const gstPercent = Number(process.env.QUOTATION_GST_PERCENT || 18);
@@ -217,6 +286,7 @@ export const createQuotationFromReminder = async (req, res) => {
     const projectLabel = reminder.domainName || reminder.projectName || "your website";
     const quotationNumber = await generateQuotationNumber(quotationType);
 
+    const mongoSaveStartHr = process.hrtime.bigint();
     const quotation = await Quotation.create({
       user: req.user.id,
       reminder: reminder._id,
@@ -256,14 +326,73 @@ export const createQuotationFromReminder = async (req, res) => {
       sentAt: null,
     });
 
-    res.status(201).json(quotation);
+    const mongoSaveMs = Number(process.hrtime.bigint() - mongoSaveStartHr) / 1e6;
+    const quoteCreationMs = Number(process.hrtime.bigint() - quoteStartHr) / 1e6;
+    const benchmarks = buildBenchmarkMetrics({
+      requestStartMs,
+      mongoSaveMs,
+      quoteCreationMs,
+    });
+
+    quotation.benchmarks = benchmarks;
+    await quotation.save();
+
+    res.status(201).json({
+      quotation,
+      timing: createRequestTimingMeta(requestStartMs),
+      benchmarks,
+    });
   } catch (err) {
     console.error("[QUOTATION] Create failed:", err?.message || err);
-    res.status(500).json({ message: "Failed to create quotation" });
+    res.status(500).json({
+      message: "Failed to create quotation",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
+  }
+};
+
+export const getQuotationBenchmarkSummary = async (req, res) => {
+  const requestStartMs = Date.now();
+  try {
+    const documents = await Quotation.find(
+      { user: req.user.id },
+      { benchmarks: 1, createdAt: 1, _id: 0 }
+    )
+      .sort({ createdAt: -1 })
+      .limit(500)
+      .lean();
+
+    const ingestionMsValues = documents
+      .map((doc) => doc?.benchmarks?.transactionIngestionMs)
+      .filter((value) => value !== null && value !== undefined);
+    const mongoSecondsValues = documents
+      .map((doc) => doc?.benchmarks?.mongoRecordSavingSeconds)
+      .filter((value) => value !== null && value !== undefined);
+    const quoteSecondsValues = documents
+      .map((doc) => doc?.benchmarks?.automatedQuoteCreationSeconds)
+      .filter((value) => value !== null && value !== undefined);
+
+    return res.json({
+      sampleSize: documents.length,
+      window: "last-500-quotations",
+      metrics: {
+        transactionIngestionMs: computeStats(ingestionMsValues),
+        mongoRecordSavingSeconds: computeStats(mongoSecondsValues),
+        automatedQuoteCreationSeconds: computeStats(quoteSecondsValues),
+      },
+      timing: createRequestTimingMeta(requestStartMs),
+    });
+  } catch (err) {
+    console.error("[QUOTATION] Benchmark summary failed:", err?.message || err);
+    return res.status(500).json({
+      message: "Failed to fetch benchmark summary",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   }
 };
 
 export const getQuotations = async (req, res) => {
+  const requestStartMs = Date.now();
   try {
     const page = Number(req.query.page) || 1;
     const limit = 10;
@@ -309,14 +438,19 @@ export const getQuotations = async (req, res) => {
       page,
       total,
       totalPages: Math.max(1, Math.ceil(total / limit)),
+      timing: createRequestTimingMeta(requestStartMs),
     });
   } catch (err) {
     console.error("[QUOTATION] Fetch failed:", err?.message || err);
-    res.status(500).json({ message: "Failed to fetch quotations" });
+    res.status(500).json({
+      message: "Failed to fetch quotations",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   }
 };
 
 export const getQuotationById = async (req, res) => {
+  const requestStartMs = Date.now();
   try {
     const quotation = await Quotation.findOne({
       _id: req.params.id,
@@ -324,7 +458,10 @@ export const getQuotationById = async (req, res) => {
     });
 
     if (!quotation) {
-      return res.status(404).json({ message: "Quotation not found" });
+      return res.status(404).json({
+        message: "Quotation not found",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     const quotationData = quotation.toObject();
@@ -333,14 +470,19 @@ export const getQuotationById = async (req, res) => {
     res.json({
       ...quotationData,
       previewHtml: buildQuotationPreviewHtml(quotationData),
+      timing: createRequestTimingMeta(requestStartMs),
     });
   } catch (err) {
     console.error("[QUOTATION] Get by id failed:", err?.message || err);
-    res.status(500).json({ message: "Failed to fetch quotation" });
+    res.status(500).json({
+      message: "Failed to fetch quotation",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   }
 };
 
 export const updateQuotation = async (req, res) => {
+  const requestStartMs = Date.now();
   try {
     const existingQuotation = await Quotation.findOne({
       _id: req.params.id,
@@ -348,7 +490,10 @@ export const updateQuotation = async (req, res) => {
     });
 
     if (!existingQuotation) {
-      return res.status(404).json({ message: "Quotation not found" });
+      return res.status(404).json({
+        message: "Quotation not found",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     const allowedFields = [
@@ -398,7 +543,10 @@ export const updateQuotation = async (req, res) => {
     }
 
     if (!["with-gst", "without-gst"].includes(quotationData.quotationType)) {
-      return res.status(400).json({ message: "Invalid quotation type" });
+      return res.status(400).json({
+        message: "Invalid quotation type",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     quotationData.serviceType = normalizeServiceType(quotationData.serviceType);
@@ -427,14 +575,21 @@ export const updateQuotation = async (req, res) => {
     quotationData.sentAt = null;
 
     const newQuotationVersion = await Quotation.create(quotationData);
-    return res.status(201).json(newQuotationVersion);
+    return res.status(201).json({
+      quotation: newQuotationVersion,
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   } catch (err) {
     console.error("[QUOTATION] Update failed:", err?.message || err);
-    res.status(500).json({ message: "Failed to update quotation" });
+    res.status(500).json({
+      message: "Failed to update quotation",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   }
 };
 
 export const sendQuotation = async (req, res) => {
+  const requestStartMs = Date.now();
   try {
     const quotation = await Quotation.findOne({
       _id: req.params.id,
@@ -442,17 +597,26 @@ export const sendQuotation = async (req, res) => {
     });
 
     if (!quotation) {
-      return res.status(404).json({ message: "Quotation not found" });
+      return res.status(404).json({
+        message: "Quotation not found",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     if (!quotation.reviewed) {
       return res
         .status(400)
-        .json({ message: "Manual edit/review is required before sending quotation" });
+        .json({
+          message: "Manual edit/review is required before sending quotation",
+          timing: createRequestTimingMeta(requestStartMs),
+        });
     }
 
     if (!quotation.clientEmail) {
-      return res.status(400).json({ message: "Client email is required" });
+      return res.status(400).json({
+        message: "Client email is required",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
     }
 
     const paymentState = derivePaymentState(quotation.totalAmount, quotation.amountPaid);
@@ -470,6 +634,7 @@ export const sendQuotation = async (req, res) => {
     if (!incomingPdfBase64) {
       return res.status(400).json({
         message: "PDF content missing. Please regenerate quotation and send again.",
+        timing: createRequestTimingMeta(requestStartMs),
       });
     }
 
@@ -504,7 +669,10 @@ export const sendQuotation = async (req, res) => {
     if (!sent?.id) {
       return res
         .status(502)
-        .json({ message: sent?.error || "Failed to send quotation email" });
+        .json({
+          message: sent?.error || "Failed to send quotation email",
+          timing: createRequestTimingMeta(requestStartMs),
+        });
     }
 
     quotation.sent = true;
@@ -523,14 +691,19 @@ export const sendQuotation = async (req, res) => {
       paymentLinkUrl: quotation.paymentLinkUrl,
       paymentLinkId: quotation.paymentLinkId,
       quotation,
+      timing: createRequestTimingMeta(requestStartMs),
     });
   } catch (err) {
     console.error("[QUOTATION] Send failed:", err?.message || err);
-    res.status(500).json({ message: err?.message || "Failed to send quotation" });
+    res.status(500).json({
+      message: err?.message || "Failed to send quotation",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   }
 };
 
 export const generateQuotationPaymentLink = async (req, res) => {
+  const requestStartMs = Date.now();
   try {
     const quotation = await Quotation.findOne({
       _id: req.params.id,
@@ -564,6 +737,7 @@ export const generateQuotationPaymentLink = async (req, res) => {
         paymentLinkUrl: "",
         paymentLinkId: "",
         quotation,
+        timing: createRequestTimingMeta(requestStartMs),
       });
     }
 
@@ -609,10 +783,12 @@ export const generateQuotationPaymentLink = async (req, res) => {
       paymentLinkUrl: quotation.paymentLinkUrl,
       paymentLinkId: quotation.paymentLinkId,
       quotation,
+      timing: createRequestTimingMeta(requestStartMs),
     });
   } catch (err) {
     res.status(500).json({
       message: err?.message || "Failed to generate payment link",
+      timing: createRequestTimingMeta(requestStartMs),
     });
   }
 };
@@ -653,11 +829,18 @@ export const downloadQuotationPdf = async (req, res) => {
 };
 
 export const deleteQuotation = async (req, res) => {
+  const requestStartMs = Date.now();
   try {
     await Quotation.findOneAndDelete({ _id: req.params.id, user: req.user.id });
-    res.json({ message: "Quotation deleted" });
+    res.json({
+      message: "Quotation deleted",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   } catch (err) {
     console.error("[QUOTATION] Delete failed:", err?.message || err);
-    res.status(500).json({ message: "Failed to delete quotation" });
+    res.status(500).json({
+      message: "Failed to delete quotation",
+      timing: createRequestTimingMeta(requestStartMs),
+    });
   }
 };

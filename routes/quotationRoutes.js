@@ -3,6 +3,7 @@ import authMiddleware from "../middleware/authMiddleware.js";
 import {
   createQuotationFromReminder,
   getQuotations,
+  getQuotationBenchmarkSummary,
   getQuotationById,
   updateQuotation,
   generateQuotationPaymentLink,
@@ -16,6 +17,7 @@ const router = express.Router();
 router.use(authMiddleware);
 
 router.get("/", getQuotations);
+router.get("/benchmarks/summary", getQuotationBenchmarkSummary);
 router.post("/from-reminder/:reminderId", createQuotationFromReminder);
 router.get("/:id", getQuotationById);
 router.put("/:id", updateQuotation);

@@ -70,6 +70,12 @@ const quotationSchema = new mongoose.Schema(
 
     sent: { type: Boolean, default: false },
     sentAt: { type: Date, default: null },
+
+    benchmarks: {
+      transactionIngestionMs: { type: Number, default: null },
+      mongoRecordSavingSeconds: { type: Number, default: null },
+      automatedQuoteCreationSeconds: { type: Number, default: null },
+    },
   },
   { timestamps: true }
 );
