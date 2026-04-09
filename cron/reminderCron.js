@@ -53,8 +53,14 @@ async function runReminderCron() {
         timeStyle: "short",
       });
 
+      const isExpired = now >= r.expiryDate;
+      const noticeTitle = isExpired ? "Subscription Expired Notice" : "Subscription Expiry Notice";
+      const statusLine = isExpired
+        ? `Your service has expired on ${expiryIST}.`
+        : `Your service is about to expire on ${expiryIST}.`;
+
       const message = `
-📢 Subscription Reminder
+📢 ${noticeTitle}
 
 Client: ${r.clientName}
 Project: ${r.projectName}
@@ -62,7 +68,7 @@ Domain: ${r.domainName || "-"}
 Expiry: ${expiryIST}
 Amount: ₹${r.amount ?? "-"}
 
-Please renew on time.
+${statusLine}
 `;
 
       if (r.mobile1) {
@@ -90,7 +96,7 @@ Please renew on time.
           console.log(`[CRON][EMAIL] Sending ${r._id} -> ${r.email}`);
           const emailResult = await sendEmail({
             to: r.email,
-            subject: "Subscription Expiry Reminder",
+            subject: noticeTitle,
             text: message,
           });
 
