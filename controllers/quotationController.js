@@ -155,19 +155,23 @@ function subjectByServiceType(serviceType) {
 function serviceDescriptionByType(serviceType) {
   switch (serviceType) {
     case "Domain":
-      return "Domain Renewal For 1 Year";
+      return "Domain Renewal";
     case "Hosting and SSL":
-      return "Hosting & SSL Certificate For 1 Year";
+      return "Hosting & SSL Certificate Renewal";
     case "Website maintenance":
-      return "Website Maintenance Service For 1 Year";
+      return "Website Maintenance Service Renewal";
     default:
-      return `${serviceType || "Service"} Renewal For 1 Year`;
+      return `${serviceType || "Service"} Renewal Service`;
   }
 }
 
-function buildIntroText(serviceType, projectLabel, expiry) {
+function buildIntroText(serviceType, projectLabel, expiry, expiryDate) {
   const serviceLabel = serviceLabelByType(serviceType);
-  return `As per our discussion, sending you the quotation for ${serviceLabel} service renewal for ${projectLabel}. The service is going to expire on ${expiry}. Please check renewal plans listed below:`;
+  const hasExpired = new Date(expiryDate).getTime() <= Date.now();
+  const statusText = hasExpired
+    ? `The service has expired on ${expiry}.`
+    : `The service is going to expire on ${expiry}.`;
+  return `As per our discussion, sending you the quotation for ${serviceLabel} service renewal for ${projectLabel}. ${statusText} Please check renewal plans listed below:`;
 }
 
 function deriveAmounts(amount, quotationType, gstPercent) {
@@ -300,7 +304,7 @@ export const createQuotationFromReminder = async (req, res) => {
       recipientAddress: "",
 
       subject: subjectByServiceType(reminderServiceType),
-      introText: buildIntroText(reminderServiceType, projectLabel, expiry),
+      introText: buildIntroText(reminderServiceType, projectLabel, expiry, reminder.expiryDate),
       serviceDescription: serviceDescriptionByType(reminderServiceType),
       expiryText: expiry,
       paymentTerms: "100% advance along with the Purchase Order.",
@@ -551,7 +555,6 @@ export const updateQuotation = async (req, res) => {
 
     quotationData.serviceType = normalizeServiceType(quotationData.serviceType);
     quotationData.subject = subjectByServiceType(quotationData.serviceType);
-    quotationData.serviceDescription = serviceDescriptionByType(quotationData.serviceType);
 
     const gstPercent = Number(quotationData.gstPercent || 0);
     const amounts = deriveAmounts(quotationData.amount, quotationData.quotationType, gstPercent);
