@@ -18,6 +18,11 @@ const reminderSchema = new mongoose.Schema(
     email: { type: String },
 
     projectName: { type: String, required: true },
+    serviceType: {
+      type: String,
+      trim: true,
+      required: true,
+    },
     domainName: { type: String },
 
     /* ================= DATES ================= */
@@ -34,6 +39,14 @@ const reminderSchema = new mongoose.Schema(
     notificationSent: {
       type: Boolean,
       default: false,
+    },
+    quotationSent: {
+      type: Boolean,
+      default: false,
+    },
+    quotationSentAt: {
+      type: Date,
+      default: null,
     },
 
     /* ================= RECURRING ================= */
@@ -64,5 +77,8 @@ const reminderSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+reminderSchema.index({ user: 1, expiryDate: 1 });
+reminderSchema.index({ user: 1, status: 1 });
 
 export default mongoose.model("Reminder", reminderSchema);

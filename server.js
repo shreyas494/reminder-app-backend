@@ -4,61 +4,137 @@ dotenv.config();
 import express from "express";
 import mongoose from "mongoose";
 import cors from "cors";
-
-// Routes
-import authRoutes from "./routes/authRoutes.js";
-import adminRoutes from "./routes/adminRoutes.js";
-import reminderRoutes from "./routes/reminderRoutes.js";
-import contactRoutes from "./routes/contacts.js";
+import path from "path";
+import { fileURLToPath } from "url";
+import { registerApiRoutes } from "./config/apiRoutes.js";
 
 // Cron
 import "./cron/reminderCron.js";
 
 const app = express();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 /* 🔑 FIX LOGIN / POSTMESSAGE ISSUE */
 app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+  res.setHeader("Cross-Origin-Opener-Policy", "unsafe-none");
   res.setHeader("Cross-Origin-Embedder-Policy", "unsafe-none");
   next();
 });
 
 /* ---------- CORS ---------- */
-app.use(
-  cors({
-    origin: [
+const corsOptions = {
+  origin: (origin, callback) => {
+    const allowedOrigins = [
       "http://localhost:5173",
       "https://reminder-app-frontend.vercel.app",
       "https://reminder-app-frontend-nine.vercel.app",
-    ],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  })
+    ];
+
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.includes(origin) ||
+      /^https:\/\/reminder-app-frontend(-[a-z0-9]+)?\.vercel\.app$/i.test(origin)
+    ) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+
+app.use(
+  cors(corsOptions)
 );
 
-app.options("*", cors());
+app.options("*", cors(corsOptions));
 
 /* ---------- BODY PARSER ---------- */
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use("/assets", express.static(path.join(__dirname, "public")));
+
+/* ---------- HEALTH (keep-alive ping) ---------- */
+app.get("/api/health", (req, res) => {
+  const states = {
+    0: "disconnected",
+    1: "connected",
+    2: "connecting",
+    3: "disconnecting",
+  };
+
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    dbState: states[mongoose.connection.readyState] || "unknown",
+  });
+});
+
+/* ---------- PING / KEEP-ALIVE (ultra-light) ---------- */
+const keepAliveHandler = (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.type("text/plain").status(200).send("ok");
+};
+
+app.get("/alive", keepAliveHandler);
+app.head("/alive", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).end();
+});
+
+app.get("/alive-204", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(204).end();
+});
+app.head("/alive-204", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(204).end();
+});
+
+app.get("/api/ping", keepAliveHandler);
+app.head("/api/ping", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).end();
+});
+
+app.get("/api/keep-alive", keepAliveHandler);
+app.head("/api/keep-alive", (req, res) => {
+  res.setHeader("Cache-Control", "no-store");
+  res.status(200).end();
+});
 
 /* ---------- ROUTES ---------- */
-app.use("/api/auth", authRoutes);
-app.use("/api/admin", adminRoutes);
-app.use("/api/reminders", reminderRoutes);
-app.use("/api/contacts", contactRoutes);
-
-/* ---------- DB ---------- */
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => {
-    console.error("❌ MongoDB connection failed:", err.message);
-    process.exit(1);
-  });
+registerApiRoutes(app);
 
 /* ---------- SERVER ---------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
+
+/* ---------- DB ---------- */
+const connectWithRetry = async () => {
+  if (!process.env.MONGO_URI) {
+    console.error("❌ MONGO_URI is not configured");
+    return;
+  }
+
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("✅ MongoDB connected");
+  } catch (err) {
+    console.error("❌ MongoDB connection failed:", err.message);
+    setTimeout(connectWithRetry, 15000);
+  }
+};
+
+mongoose.connection.on("disconnected", () => {
+  console.warn("⚠️ MongoDB disconnected. Retrying...");
+  setTimeout(connectWithRetry, 15000);
+});
+
+connectWithRetry();

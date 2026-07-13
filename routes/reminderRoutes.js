@@ -2,6 +2,7 @@ import express from "express";
 import {
   createReminder,
   getReminders,
+  getNearExpiryReminders,
   updateReminder,
   deleteReminder,
 } from "../controllers/reminderController.js";
@@ -21,6 +22,7 @@ router.use(authMiddleware);
 /* ---------- ROUTES ---------- */
 router.post("/", createReminder);
 router.get("/", getReminders);
+router.get("/near-expiry", getNearExpiryReminders);
 
 /* EDIT (details only) */
 router.put("/:id", updateReminder);

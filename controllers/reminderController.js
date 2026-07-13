@@ -1,6 +1,13 @@
 import Reminder from "../models/Reminder.js";
 import { calculateRecurringStartAt } from "../utils/calculateRecurringStartAt.js";
 
+const DEFAULT_SERVICE_TYPE = "Domain,Hosting and SSL";
+
+function normalizeServiceType(serviceType) {
+  const value = String(serviceType || "").trim();
+  return value || DEFAULT_SERVICE_TYPE;
+}
+
 /* =====================================================
    CREATE REMINDER (UNCHANGED)
    ===================================================== */
@@ -13,6 +20,7 @@ export const createReminder = async (req, res) => {
       mobile2,
       email,
       projectName,
+      serviceType,
       domainName,
       activationDate,
       expiryDate,
@@ -23,13 +31,19 @@ export const createReminder = async (req, res) => {
 
     if (
       !clientName ||
-      !contactPerson ||
       !mobile1 ||
       !projectName ||
       !activationDate ||
-      !expiryDate
+      !expiryDate ||
+      amount === undefined ||
+      amount === null ||
+      String(amount).trim() === ""
     ) {
       return res.status(400).json({ message: "Missing required fields" });
+    }
+
+    if (Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+      return res.status(400).json({ message: "Amount must be greater than 0" });
     }
 
     const activation = new Date(activationDate);
@@ -50,11 +64,12 @@ export const createReminder = async (req, res) => {
     const reminder = await Reminder.create({
       user: req.user.id,
       clientName,
-      contactPerson,
+      contactPerson: String(contactPerson || "").trim() || clientName,
       mobile1,
       mobile2,
       email,
       projectName,
+      serviceType: normalizeServiceType(serviceType),
       domainName,
       activationDate: activation,
       expiryDate: expiry,
@@ -67,6 +82,8 @@ export const createReminder = async (req, res) => {
       status: "active",
       renewed: false,
       notificationSent: false,
+      quotationSent: false,
+      quotationSentAt: null,
     });
 
     res.status(201).json(reminder);
@@ -112,6 +129,49 @@ export const getReminders = async (req, res) => {
   });
 };
 
+/* =====================================================
+   READ NEAR-EXPIRY REMINDERS (NEXT 30 DAYS)
+   ===================================================== */
+export const getNearExpiryReminders = async (req, res) => {
+  Reminder.updateMany(
+    { user: req.user.id, expiryDate: { $lt: new Date() }, status: "active" },
+    { $set: { status: "expired" } }
+  ).catch(() => {});
+
+  const page = Number(req.query.page) || 1;
+  const limit = 10;
+  const skip = (page - 1) * limit;
+
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 30);
+  end.setHours(23, 59, 59, 999);
+
+  const query = {
+    user: req.user.id,
+    expiryDate: { $gte: start, $lte: end },
+  };
+
+  const [data, total] = await Promise.all([
+    Reminder.find(query)
+      .select("clientName contactPerson mobile1 mobile2 email projectName domainName expiryDate amount renewals")
+      .lean()
+      .sort({ expiryDate: 1 })
+      .skip(skip)
+      .limit(limit),
+    Reminder.countDocuments(query),
+  ]);
+
+  res.json({
+    data,
+    page,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+    total,
+  });
+};
+
 
 /* =====================================================
    UPDATE / RENEW REMINDER (UNCHANGED)
@@ -126,22 +186,36 @@ export const updateReminder = async (req, res) => {
     return res.status(404).json({ message: "Reminder not found" });
   }
 
-  if (reminder.status === "expired") {
-    return res
-      .status(403)
-      .json({ message: "Expired reminders cannot be edited" });
-  }
+  const isRenewRequest = req.method === "PATCH";
 
   /* ===============================
-     🔁 RENEW — ONLY if expiryDate EXISTS
+     🔁 RENEW — PATCH /:id
      =============================== */
-  if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
+  if (isRenewRequest) {
+    if (!Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
+      return res.status(400).json({
+        message: "Expiry date is required for renew",
+      });
+    }
+
     const newExpiry = new Date(req.body.expiryDate);
     newExpiry.setUTCHours(0, 0, 0, 0);
+
+    if (Number.isNaN(newExpiry.getTime())) {
+      return res.status(400).json({
+        message: "Invalid expiry date",
+      });
+    }
 
     if (newExpiry <= reminder.activationDate) {
       return res.status(400).json({
         message: "Expiry must be after activation date",
+      });
+    }
+
+    if (newExpiry <= reminder.expiryDate) {
+      return res.status(400).json({
+        message: "Renewed expiry must be later than current expiry date",
       });
     }
 
@@ -152,6 +226,8 @@ export const updateReminder = async (req, res) => {
 
     reminder.expiryDate = newExpiry;
     reminder.notificationSent = false;
+    reminder.quotationSent = false;
+    reminder.quotationSentAt = null;
 
     reminder.reminderAt = reminder.recurringEnabled
       ? calculateRecurringStartAt(newExpiry)
@@ -171,6 +247,7 @@ export const updateReminder = async (req, res) => {
       mobile2,
       email,
       projectName,
+      serviceType,
       domainName,
       amount,
       recurringEnabled,
@@ -187,6 +264,7 @@ export const updateReminder = async (req, res) => {
 
     if (email !== undefined) reminder.email = email;
     if (projectName !== undefined) reminder.projectName = projectName;
+    if (serviceType !== undefined) reminder.serviceType = normalizeServiceType(serviceType);
     if (domainName !== undefined) reminder.domainName = domainName;
     if (amount !== undefined) reminder.amount = amount;
 
