@@ -33,7 +33,9 @@ export const createReminder = async (req, res) => {
     }
 
     const activation = new Date(activationDate);
+    activation.setUTCHours(0, 0, 0, 0);
     const expiry = new Date(expiryDate);
+    expiry.setUTCHours(0, 0, 0, 0);
 
     if (expiry <= activation) {
       return res
@@ -135,6 +137,7 @@ export const updateReminder = async (req, res) => {
      =============================== */
   if (Object.prototype.hasOwnProperty.call(req.body, "expiryDate")) {
     const newExpiry = new Date(req.body.expiryDate);
+    newExpiry.setUTCHours(0, 0, 0, 0);
 
     if (newExpiry <= reminder.activationDate) {
       return res.status(400).json({
