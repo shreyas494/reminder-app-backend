@@ -164,6 +164,16 @@ export const getNearExpiryReminders = async (req, res) => {
     expiryDate: { $gte: start, $lte: end },
   };
 
+  if (req.query.clientName) {
+    query.clientName = { $regex: req.query.clientName, $options: "i" };
+  }
+  if (req.query.contactPerson) {
+    query.contactPerson = { $regex: req.query.contactPerson, $options: "i" };
+  }
+  if (req.query.projectName) {
+    query.projectName = { $regex: req.query.projectName, $options: "i" };
+  }
+
   const [data, total] = await Promise.all([
     Reminder.find(query)
       .select("clientName contactPerson mobile1 mobile2 email projectName domainName expiryDate amount renewals")
