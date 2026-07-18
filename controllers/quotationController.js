@@ -69,18 +69,40 @@ function computeStats(values = []) {
   };
 }
 
+function getCurrentFinancialYear() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed: 0 = Jan, 11 = Dec
+
+  let startYear;
+  if (currentMonth >= 3) {
+    // April or later
+    startYear = currentYear;
+  } else {
+    // Jan - March
+    startYear = currentYear - 1;
+  }
+
+  const endYear = startYear + 1;
+  const startYearShort = String(startYear).slice(-2);
+  const endYearShort = String(endYear).slice(-2);
+  return `${startYearShort}-${endYearShort}`;
+}
+
 function getQuotationSeriesConfig(quotationType) {
   const isGst = quotationType === "with-gst";
+  const fy = getCurrentFinancialYear();
   return {
-    counterName: isGst ? "quotation-number-gst" : "quotation-number-non-gst",
+    counterName: isGst ? `quotation-number-gst-${fy}` : `quotation-number-non-gst-${fy}`,
     prefix: isGst
       ? (process.env.QUOTATION_PREFIX_GST || process.env.QUOTATION_PREFIX || "GST-QTN")
       : (process.env.QUOTATION_PREFIX_NON_GST || process.env.QUOTATION_PREFIX || "NGST-QTN"),
+    fy,
   };
 }
 
 async function generateQuotationNumber(quotationType) {
-  const { counterName, prefix } = getQuotationSeriesConfig(quotationType);
+  const { counterName, prefix, fy } = getQuotationSeriesConfig(quotationType);
   const counter = await Counter.findOneAndUpdate(
     { name: counterName },
     { $inc: { seq: 1 } },
@@ -88,7 +110,7 @@ async function generateQuotationNumber(quotationType) {
   );
 
   const seq = Number(counter?.seq || 1);
-  return `${prefix}-${String(seq).padStart(4, "0")}`;
+  return `${prefix}-${fy}-${String(seq).padStart(4, "0")}`;
 }
 
 const FALLBACK_LOGO_URL = "https://reminder-app-backend-u8wb.onrender.com/assets/company-logo.png";
@@ -100,25 +122,50 @@ function resolveLogoUrl(value) {
   return FALLBACK_LOGO_URL;
 }
 
-function getCompanyDefaults() {
-  return {
-    companyName: process.env.COMPANY_NAME || "Lemonade Software Developers",
-    companyAddress:
-      process.env.COMPANY_ADDRESS ||
-      "C-1, Geetadham Bhakti Apartment, Bhavani Peth, Shelgi Naka, Solapur - 413002.",
-    companyRegistration:
-      process.env.COMPANY_REGISTRATION || "2131100315838724",
-    companyPhone: process.env.COMPANY_PHONE || "+91 87 88 99 88 20",
-    companyTagline:
-      process.env.COMPANY_TAGLINE ||
-      "Software Development – Website Development – App Development – Digital Marketing",
-    companyLogoUrl: resolveLogoUrl(process.env.COMPANY_LOGO_URL),
-    senderName: process.env.QUOTATION_SENDER_NAME || "Shashank Deshpande",
-    senderPhone:
-      process.env.QUOTATION_SENDER_PHONE ||
-      process.env.COMPANY_PHONE ||
-      "+91 87 88 99 88 20",
-  };
+function getCompanyDefaults(quotationType) {
+  const isGst = quotationType === "with-gst";
+
+  if (isGst) {
+    return {
+      companyName: process.env.COMPANY_NAME || "Lemonade Software Developers",
+      companyAddress:
+        process.env.COMPANY_ADDRESS ||
+        "C-1, Geetadham Bhakti Apartment, Bhavani Peth, Shelgi Naka, Solapur - 413002.",
+      companyRegistration:
+        process.env.COMPANY_REGISTRATION || "2131100315838724",
+      companyPhone: process.env.COMPANY_PHONE || "+91 87 88 99 88 20",
+      companyTagline:
+        process.env.COMPANY_TAGLINE ||
+        "Software Development – Website Development – App Development – Digital Marketing",
+      companyLogoUrl: resolveLogoUrl(process.env.COMPANY_LOGO_URL),
+      senderName: process.env.QUOTATION_SENDER_NAME || "Shashank Deshpande",
+      senderPhone:
+        process.env.QUOTATION_SENDER_PHONE ||
+        process.env.COMPANY_PHONE ||
+        "+91 87 88 99 88 20",
+    };
+  } else {
+    return {
+      companyName: process.env.COMPANY_NAME_NON_GST || process.env.COMPANY_NAME || "Lemonade Software Developers",
+      companyAddress:
+        process.env.COMPANY_ADDRESS_NON_GST ||
+        process.env.COMPANY_ADDRESS ||
+        "C-1, Geetadham Bhakti Apartment, Bhavani Peth, Shelgi Naka, Solapur - 413002.",
+      companyRegistration:
+        process.env.COMPANY_REGISTRATION_NON_GST || "", // Omit or empty for non-GST
+      companyPhone: process.env.COMPANY_PHONE_NON_GST || process.env.COMPANY_PHONE || "+91 87 88 99 88 20",
+      companyTagline:
+        process.env.COMPANY_TAGLINE_NON_GST ||
+        process.env.COMPANY_TAGLINE ||
+        "Software Development – Website Development – App Development – Digital Marketing",
+      companyLogoUrl: resolveLogoUrl(process.env.COMPANY_LOGO_URL_NON_GST || process.env.COMPANY_LOGO_URL),
+      senderName: process.env.QUOTATION_SENDER_NAME || "Shashank Deshpande",
+      senderPhone:
+        process.env.QUOTATION_SENDER_PHONE ||
+        process.env.COMPANY_PHONE ||
+        "+91 87 88 99 88 20",
+    };
+  }
 }
 
 function toExpiryText(expiryDate) {
@@ -284,7 +331,7 @@ export const createQuotationFromReminder = async (req, res) => {
 
     const gstPercent = Number(process.env.QUOTATION_GST_PERCENT || 18);
     const amounts = deriveAmounts(reminder.amount, quotationType, gstPercent);
-    const defaults = getCompanyDefaults();
+    const defaults = getCompanyDefaults(quotationType);
     const reminderServiceType = normalizeServiceType(reminder.serviceType);
     const expiry = toExpiryText(reminder.expiryDate);
     const projectLabel = reminder.domainName || reminder.projectName || "your website";
@@ -539,6 +586,15 @@ export const updateQuotation = async (req, res) => {
           hasAnyChange = true;
         }
         quotationData[field] = incomingValue;
+      }
+    }
+
+    if (existingQuotation.quotationType !== quotationData.quotationType) {
+      const newDefaults = getCompanyDefaults(quotationData.quotationType);
+      for (const field of ["companyName", "companyAddress", "companyRegistration", "companyPhone", "companyTagline", "companyLogoUrl"]) {
+        if (!Object.prototype.hasOwnProperty.call(req.body, field)) {
+          quotationData[field] = newDefaults[field];
+        }
       }
     }
 

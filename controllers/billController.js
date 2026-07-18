@@ -4,18 +4,40 @@ import Quotation from "../models/Quotation.js";
 import { sendEmail } from "../services/emailService.js";
 import { buildBillPreviewHtml } from "../services/billDocumentService.js";
 
+function getCurrentFinancialYear() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth(); // 0-indexed: 0 = Jan, 11 = Dec
+
+  let startYear;
+  if (currentMonth >= 3) {
+    // April or later
+    startYear = currentYear;
+  } else {
+    // Jan - March
+    startYear = currentYear - 1;
+  }
+
+  const endYear = startYear + 1;
+  const startYearShort = String(startYear).slice(-2);
+  const endYearShort = String(endYear).slice(-2);
+  return `${startYearShort}-${endYearShort}`;
+}
+
 function getBillSeriesConfig(billType) {
   const isGst = billType === "with-gst";
+  const fy = getCurrentFinancialYear();
   return {
-    counterName: isGst ? "bill-number-gst" : "bill-number-non-gst",
+    counterName: isGst ? `bill-number-gst-${fy}` : `bill-number-non-gst-${fy}`,
     prefix: isGst
       ? (process.env.BILL_PREFIX_GST || process.env.BILL_PREFIX || "GST-BILL")
       : (process.env.BILL_PREFIX_NON_GST || process.env.BILL_PREFIX || "NGST-BILL"),
+    fy,
   };
 }
 
 async function generateBillNumber(billType) {
-  const { counterName, prefix } = getBillSeriesConfig(billType);
+  const { counterName, prefix, fy } = getBillSeriesConfig(billType);
   const counter = await Counter.findOneAndUpdate(
     { name: counterName },
     { $inc: { seq: 1 } },
@@ -23,7 +45,7 @@ async function generateBillNumber(billType) {
   );
 
   const seq = Number(counter?.seq || 1);
-  return `${prefix}-${String(seq).padStart(4, "0")}`;
+  return `${prefix}-${fy}-${String(seq).padStart(4, "0")}`;
 }
 
 function normalizeServiceType(serviceType) {
