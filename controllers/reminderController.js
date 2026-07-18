@@ -107,9 +107,19 @@ export const getReminders = async (req, res) => {
   const limit = 5;
   const skip = (page - 1) * limit;
 
-  const reminders = await Reminder.find({
-    user: req.user.id,
-  });
+  const query = { user: req.user.id };
+
+  if (req.query.clientName) {
+    query.clientName = { $regex: req.query.clientName, $options: "i" };
+  }
+  if (req.query.contactPerson) {
+    query.contactPerson = { $regex: req.query.contactPerson, $options: "i" };
+  }
+  if (req.query.projectName) {
+    query.projectName = { $regex: req.query.projectName, $options: "i" };
+  }
+
+  const reminders = await Reminder.find(query);
 
   // ✅ SORT BY FINAL EXPIRY (MOST DUE FIRST)
   const sorted = reminders
