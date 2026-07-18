@@ -110,7 +110,7 @@ async function generateQuotationNumber(quotationType) {
   );
 
   const seq = Number(counter?.seq || 1);
-  return `${prefix}-${fy}-${String(seq).padStart(4, "0")}`;
+  return `${fy}-${String(seq).padStart(4, "0")}`;
 }
 
 const FALLBACK_LOGO_URL = "https://reminder-app-backend-u8wb.onrender.com/assets/company-logo.png";

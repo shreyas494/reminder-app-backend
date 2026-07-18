@@ -15,7 +15,6 @@ const quotationSchema = new mongoose.Schema(
     quotationNumber: {
       type: String,
       required: true,
-      unique: true,
     },
     quotationType: {
       type: String,

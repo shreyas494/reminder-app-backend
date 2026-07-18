@@ -45,7 +45,7 @@ async function generateBillNumber(billType) {
   );
 
   const seq = Number(counter?.seq || 1);
-  return `${prefix}-${fy}-${String(seq).padStart(4, "0")}`;
+  return `${fy}-${String(seq).padStart(4, "0")}`;
 }
 
 function normalizeServiceType(serviceType) {
