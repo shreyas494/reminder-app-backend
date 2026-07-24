@@ -71,7 +71,7 @@ const reminderSchema = new mongoose.Schema(
     /* ================= STATUS ================= */
     status: {
       type: String,
-      enum: ["active", "expired"],
+      enum: ["active", "expired", "cancelled"],
       default: "active",
     },
   },

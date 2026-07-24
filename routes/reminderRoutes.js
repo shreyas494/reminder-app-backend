@@ -5,6 +5,8 @@ import {
   getNearExpiryReminders,
   updateReminder,
   deleteReminder,
+  cancelReminder,
+  reactivateReminder,
 } from "../controllers/reminderController.js";
 import authMiddleware from "../middleware/authMiddleware.js";
 
@@ -29,6 +31,10 @@ router.put("/:id", updateReminder);
 
 /* RENEW (expiry change only — SAME controller, untouched logic) */
 router.patch("/:id", updateReminder);
+
+/* CANCEL / REACTIVATE */
+router.post("/:id/cancel", cancelReminder);
+router.post("/:id/reactivate", reactivateReminder);
 
 router.delete("/:id", deleteReminder);
 

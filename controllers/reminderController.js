@@ -161,6 +161,7 @@ export const getNearExpiryReminders = async (req, res) => {
 
   const query = {
     user: req.user.id,
+    status: "active",
     expiryDate: { $gte: start, $lte: end },
   };
 
@@ -308,4 +309,64 @@ export const deleteReminder = async (req, res) => {
   });
 
   res.json({ message: "Reminder deleted" });
+};
+
+/* =====================================================
+   CANCEL REMINDER
+   ===================================================== */
+export const cancelReminder = async (req, res) => {
+  try {
+    const reminder = await Reminder.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+    });
+
+    if (!reminder) {
+      return res.status(404).json({ message: "Reminder not found" });
+    }
+
+    reminder.status = "cancelled";
+    reminder.reminderAt = null; // Turn off future cron triggers
+    await reminder.save();
+
+    res.json(reminder);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+};
+
+/* =====================================================
+   REACTIVATE REMINDER
+   ===================================================== */
+export const reactivateReminder = async (req, res) => {
+  try {
+    const reminder = await Reminder.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+    });
+
+    if (!reminder) {
+      return res.status(404).json({ message: "Reminder not found" });
+    }
+
+    const now = new Date();
+    if (reminder.expiryDate <= now) {
+      return res.status(400).json({
+        message: "Cannot reactivate an expired subscription. Please renew it instead.",
+      });
+    }
+
+    reminder.status = "active";
+    reminder.notificationSent = false;
+    reminder.reminderAt = reminder.recurringEnabled
+      ? calculateRecurringStartAt(reminder.expiryDate)
+      : reminder.expiryDate;
+
+    await reminder.save();
+    res.json(reminder);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
 };
