@@ -327,7 +327,7 @@ export const cancelReminder = async (req, res) => {
 
     reminder.status = "cancelled";
     reminder.reminderAt = null; // Turn off future cron triggers
-    await reminder.save();
+    await reminder.save({ validateBeforeSave: false });
 
     res.json(reminder);
   } catch (err) {
@@ -363,7 +363,7 @@ export const reactivateReminder = async (req, res) => {
       ? calculateRecurringStartAt(reminder.expiryDate)
       : reminder.expiryDate;
 
-    await reminder.save();
+    await reminder.save({ validateBeforeSave: false });
     res.json(reminder);
   } catch (err) {
     console.error(err);
