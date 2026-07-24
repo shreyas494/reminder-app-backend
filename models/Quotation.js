@@ -12,6 +12,11 @@ const quotationSchema = new mongoose.Schema(
       ref: "Reminder",
       required: true,
     },
+    firmKey: {
+      type: String,
+      enum: ["firm1", "firm2"],
+      default: "firm1",
+    },
     quotationNumber: {
       type: String,
       required: true,

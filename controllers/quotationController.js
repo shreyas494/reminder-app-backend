@@ -89,11 +89,12 @@ function getCurrentFinancialYear() {
   return `${startYearShort}-${endYearShort}`;
 }
 
-function getQuotationSeriesConfig(quotationType) {
+function getQuotationSeriesConfig(quotationType, firmKey = "firm1") {
   const isGst = quotationType === "with-gst";
   const fy = getCurrentFinancialYear();
+  const suffix = firmKey === "firm2" ? "-firm2" : "";
   return {
-    counterName: isGst ? `quotation-number-gst-${fy}` : `quotation-number-non-gst-${fy}`,
+    counterName: isGst ? `quotation-number-gst${suffix}-${fy}` : `quotation-number-non-gst${suffix}-${fy}`,
     prefix: isGst
       ? (process.env.QUOTATION_PREFIX_GST || process.env.QUOTATION_PREFIX || "GST-QTN")
       : (process.env.QUOTATION_PREFIX_NON_GST || process.env.QUOTATION_PREFIX || "NGST-QTN"),
@@ -101,8 +102,8 @@ function getQuotationSeriesConfig(quotationType) {
   };
 }
 
-async function generateQuotationNumber(quotationType) {
-  const { counterName, prefix, fy } = getQuotationSeriesConfig(quotationType);
+async function generateQuotationNumber(quotationType, firmKey = "firm1") {
+  const { counterName, prefix, fy } = getQuotationSeriesConfig(quotationType, firmKey);
   const counter = await Counter.findOneAndUpdate(
     { name: counterName },
     { $inc: { seq: 1 } },
@@ -122,8 +123,52 @@ function resolveLogoUrl(value) {
   return FALLBACK_LOGO_URL;
 }
 
-function getCompanyDefaults(quotationType) {
+function getCompanyDefaults(quotationType, firmKey = "firm1") {
   const isGst = quotationType === "with-gst";
+
+  if (firmKey === "firm2") {
+    if (isGst) {
+      return {
+        companyName: process.env.COMPANY_NAME_FIRM2 || "Orange Tech Solutions",
+        companyAddress:
+          process.env.COMPANY_ADDRESS_FIRM2 ||
+          "Plot No. 45, Sector 15, Orange Business Park, CBD Belapur, Navi Mumbai - 400614.",
+        companyRegistration:
+          process.env.COMPANY_REGISTRATION_FIRM2 || "27ABCDE1234F1Z5",
+        companyPhone: process.env.COMPANY_PHONE_FIRM2 || "+91 98 76 54 32 10",
+        companyTagline:
+          process.env.COMPANY_TAGLINE_FIRM2 ||
+          "Cloud Infrastructure · Enterprise Software · DevOps Automation",
+        companyLogoUrl: resolveLogoUrl(process.env.COMPANY_LOGO_URL_FIRM2),
+        senderName: process.env.QUOTATION_SENDER_NAME_FIRM2 || "Shashank Deshpande",
+        senderPhone:
+          process.env.QUOTATION_SENDER_PHONE_FIRM2 ||
+          process.env.COMPANY_PHONE_FIRM2 ||
+          "+91 98 76 54 32 10",
+      };
+    } else {
+      return {
+        companyName: process.env.COMPANY_NAME_NON_GST_FIRM2 || process.env.COMPANY_NAME_FIRM2 || "Orange Tech Solutions",
+        companyAddress:
+          process.env.COMPANY_ADDRESS_NON_GST_FIRM2 ||
+          process.env.COMPANY_ADDRESS_FIRM2 ||
+          "Plot No. 45, Sector 15, Orange Business Park, CBD Belapur, Navi Mumbai - 400614.",
+        companyRegistration:
+          process.env.COMPANY_REGISTRATION_NON_GST_FIRM2 || "",
+        companyPhone: process.env.COMPANY_PHONE_NON_GST_FIRM2 || process.env.COMPANY_PHONE_FIRM2 || "+91 98 76 54 32 10",
+        companyTagline:
+          process.env.COMPANY_TAGLINE_NON_GST_FIRM2 ||
+          process.env.COMPANY_TAGLINE_FIRM2 ||
+          "Cloud Infrastructure · Enterprise Software · DevOps Automation",
+        companyLogoUrl: resolveLogoUrl(process.env.COMPANY_LOGO_URL_NON_GST_FIRM2 || process.env.COMPANY_LOGO_URL_FIRM2),
+        senderName: process.env.QUOTATION_SENDER_NAME_FIRM2 || "Shashank Deshpande",
+        senderPhone:
+          process.env.QUOTATION_SENDER_PHONE_FIRM2 ||
+          process.env.COMPANY_PHONE_FIRM2 ||
+          "+91 98 76 54 32 10",
+      };
+    }
+  }
 
   if (isGst) {
     return {
@@ -152,7 +197,7 @@ function getCompanyDefaults(quotationType) {
         process.env.COMPANY_ADDRESS ||
         "C-1, Geetadham Bhakti Apartment, Bhavani Peth, Shelgi Naka, Solapur - 413002.",
       companyRegistration:
-        process.env.COMPANY_REGISTRATION_NON_GST || "", // Omit or empty for non-GST
+        process.env.COMPANY_REGISTRATION_NON_GST || "",
       companyPhone: process.env.COMPANY_PHONE_NON_GST || process.env.COMPANY_PHONE || "+91 87 88 99 88 20",
       companyTagline:
         process.env.COMPANY_TAGLINE_NON_GST ||
@@ -312,11 +357,18 @@ export const createQuotationFromReminder = async (req, res) => {
   const quoteStartHr = process.hrtime.bigint();
   try {
     const { reminderId } = req.params;
-    const { quotationType = "with-gst" } = req.body;
+    const { quotationType = "with-gst", firmKey = "firm1" } = req.body;
 
     if (!["with-gst", "without-gst"].includes(quotationType)) {
       return res.status(400).json({
         message: "Invalid quotation type",
+        timing: createRequestTimingMeta(requestStartMs),
+      });
+    }
+
+    if (!["firm1", "firm2"].includes(firmKey)) {
+      return res.status(400).json({
+        message: "Invalid firm key",
         timing: createRequestTimingMeta(requestStartMs),
       });
     }
@@ -331,16 +383,17 @@ export const createQuotationFromReminder = async (req, res) => {
 
     const gstPercent = Number(process.env.QUOTATION_GST_PERCENT || 18);
     const amounts = deriveAmounts(reminder.amount, quotationType, gstPercent);
-    const defaults = getCompanyDefaults(quotationType);
+    const defaults = getCompanyDefaults(quotationType, firmKey);
     const reminderServiceType = normalizeServiceType(reminder.serviceType);
     const expiry = toExpiryText(reminder.expiryDate);
     const projectLabel = reminder.domainName || reminder.projectName || "your website";
-    const quotationNumber = await generateQuotationNumber(quotationType);
+    const quotationNumber = await generateQuotationNumber(quotationType, firmKey);
 
     const mongoSaveStartHr = process.hrtime.bigint();
     const quotation = await Quotation.create({
       user: req.user.id,
       reminder: reminder._id,
+      firmKey,
       quotationNumber,
       quotationType,
       serviceType: reminderServiceType,
@@ -457,6 +510,15 @@ export const getQuotations = async (req, res) => {
     }
     if (["with-gst", "without-gst"].includes(typeFilter)) {
       query.quotationType = typeFilter;
+    }
+
+    const firmFilter = String(req.query.firmKey || "").trim();
+    if (["firm1", "firm2"].includes(firmFilter)) {
+      if (firmFilter === "firm1") {
+        query.firmKey = { $in: ["firm1", null, undefined] };
+      } else {
+        query.firmKey = firmFilter;
+      }
     }
 
     const candidatesForSync = await Quotation.find({
@@ -590,7 +652,7 @@ export const updateQuotation = async (req, res) => {
     }
 
     if (existingQuotation.quotationType !== quotationData.quotationType) {
-      const newDefaults = getCompanyDefaults(quotationData.quotationType);
+      const newDefaults = getCompanyDefaults(quotationData.quotationType, existingQuotation.firmKey || "firm1");
       for (const field of ["companyName", "companyAddress", "companyRegistration", "companyPhone", "companyTagline", "companyLogoUrl"]) {
         if (!Object.prototype.hasOwnProperty.call(req.body, field)) {
           quotationData[field] = newDefaults[field];
@@ -618,7 +680,8 @@ export const updateQuotation = async (req, res) => {
     quotationData.gstAmount = amounts.gstAmount;
     quotationData.totalAmount = amounts.totalAmount;
 
-    quotationData.quotationNumber = await generateQuotationNumber(quotationData.quotationType);
+    quotationData.firmKey = existingQuotation.firmKey || "firm1";
+    quotationData.quotationNumber = await generateQuotationNumber(quotationData.quotationType, quotationData.firmKey);
     quotationData.amountPaid = 0;
     quotationData.paidAt = null;
     quotationData.paymentProvider = "razorpay";
