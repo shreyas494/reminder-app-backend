@@ -1,57 +1,59 @@
 # Subscription Cancellation & Dual Firm Quotations Guide
 
-This document outlines the workflows, changes made, and operational rules for the **Subscription Cancellation** and **Dual Firm Quotations** features.
+This document describes the changes made and how everything works in simple language.
 
 ---
 
-## 1. Subscription Cancellation & Reactivation
+## 1. Subscription Cancellation
 
-### What Changes Were Made?
-* **Database (`models/Reminder.js`)**: Added `"cancelled"` status value.
-* **Backend (`routes/reminderRoutes.js` & `controllers/reminderController.js`)**:
-  * Added `POST /api/reminders/:id/cancel` to turn off alerts (`reminderAt = null`) and set status to `"cancelled"`.
-  * Added `POST /api/reminders/:id/reactivate` to turn alerts back on for future subscriptions.
-  * Bypassed schema validations (`save({ validateBeforeSave: false })`) so status updates never fail on older database records that are missing new fields.
-  * Filtered out cancelled items from near-expiry dashboard lists.
-* **Frontend (`Dashboard.jsx`)**:
+### What was changed?
+* **Database**: Added a new `"cancelled"` status.
+* **Backend**:
+  * Added features to stop reminders when cancelled, and resume them when reactivated.
+  * Allowed updating the status of older entries without causing database check errors.
+  * Removed cancelled subscriptions from the near-expiry dashboard view.
+* **Frontend**:
   * Added a gray **Cancelled** status badge.
-  * Added conditional **Cancel** and **Reactivate** buttons to the subscriptions table.
+  * Added **Cancel** and **Reactivate** buttons to the subscriptions table.
 
-### How it Works (For All Cases)
-* **Active Subscriptions (Future Expiry)**:
-  * **To Cancel**: Click **Cancel**. The status updates to **Cancelled** and reminders stop.
-  * **To Resume**: Click **Reactivate**. The status updates back to **Active** and reminders resume.
-* **Expired Subscriptions (Past Expiry)**:
-  * **To Cancel**: Click **Cancel**. The status updates to **Cancelled** and reminders stop.
-  * **To Resume**: Reactivate is hidden. You must click **Renew** and select a new expiry date. This automatically reactivates the subscription.
-* **Cancelled Subscriptions**:
-  * **If future expiry**: Click **Reactivate** to resume, or click **Renew** to extend.
-  * **If past expiry**: You must click **Renew** to extend it.
+### How it works for all cases:
+* **For Active Subscriptions (Expiry in Future)**:
+  * **To Cancel**: Click **Cancel**. Status becomes **Cancelled** and reminders stop.
+  * **To Resume**: Click **Reactivate**. Status becomes **Active** and reminders start again.
+* **For Expired Subscriptions (Expiry in Past)**:
+  * **To Cancel**: Click **Cancel**. Status becomes **Cancelled** and reminders stop.
+  * **To Resume**: The Reactivate button is hidden. You must click **Renew** and enter a new expiry date. This automatically makes it active again.
+* **For Cancelled Subscriptions**:
+  * **If expiry is in the future**: Click **Reactivate** to resume, or click **Renew** to extend.
+  * **If expiry is in the past**: You must click **Renew** to extend and restart it.
 
 ---
 
-## 2. Dual Firm Support in Quotations
+## 2. Dual Firm Quotations
 
-### What Changes Were Made?
-* **Database (`models/Quotation.js`)**: Added `firmKey` field (enum: `["firm1", "firm2"]`, default `"firm1"`).
-* **Backend (`controllers/quotationController.js`)**:
-  * Configured company defaults for Firm 1 (`"Lemonade Software Developers"`) and Firm 2 (`"Orange Tech Solutions"`).
-  * Updated endpoints to read, save, and filter quotation records based on `firmKey` (legacy records are mapped to `"firm1"`).
-* **Frontend (`Quotations.jsx`)**:
-  * Added a tab switcher at the top of the Manual Quotations page to toggle between both firms.
-  * Updated API calls to generate and fetch quotations based on the active firm view.
-  * Reminders list remains visible in both firm views so the quotation option is initially displayed for both firms.
+### What was changed?
+* **Database**: Allowed saving which firm generated the quotation.
+* **Backend**:
+  * Added support for two separate firms:
+    * **Firm 1**: `"Lemonade Software Developers"` (default setup).
+    * **Firm 2**: `"Orange Tech Solutions"` (its own address, phone number, and details).
+  * Allowed loading and saving quotations separately for each firm.
+* **Frontend**:
+  * Added a firm selector tab bar at the top of the Quotations page.
+  * Only show quotations belonging to the selected firm.
+  * The option to create a quotation for any subscription is available under both firms.
 
-### Quotation Numbering Rules
-* Both firms maintain independent, consecutive numbering sequences.
-* **Formatting**:
-  * **Firm 1**: `[FinancialYear]-[4-Digit-Sequence]` (e.g. `26-27-0003`)
-  * **Firm 2**: `[FinancialYear]-[4-Digit-Sequence]-F2` (e.g. `26-27-0003-F2`)
-  * *The `-F2` suffix differentiates Firm 2's numbers from Firm 1's and prevents duplicate key clashes in the database.*
+### How Quotation Numbering Works:
+* Both firms count their own numbers independently (e.g. `0001`, `0002`...).
+* **Format**:
+  * **Firm 1**: Uses `26-27-0003` (Year - Number).
+  * **Firm 2**: Uses `26-27-0003-F2` (ends with `-F2` to keep it separate and avoid database errors).
 
 ---
 
 ## 3. Interactive Payment Buttons in PDFs
-* Instead of printing the raw hyperlink text, the generated quotation PDFs (both downloaded and emailed) now feature a styled **Pay Online Now** graphical button.
-* Clicking the button redirects the user directly to the Razorpay checkout gateway.
 
+### What was changed?
+* Instead of printing a long, raw website link (like `https://api.razorpay.com/...`) in the PDF:
+* The generated PDFs (both downloaded and emailed) now have a blue **Pay Online Now** button.
+* When clicked, this button opens the payment link directly in a web browser.
