@@ -135,13 +135,24 @@ export async function buildQuotationPdfBuffer(quotation) {
     doc.font("Helvetica").fontSize(11).text(`Payment: ${quotation.paymentTerms || "100% advance along with the Purchase Order."}`);
 
     if (quotation.paymentLinkUrl) {
-      doc.moveDown(0.8);
-      doc.font("Helvetica-Bold").fontSize(11).text("Payment Link:");
-      doc.font("Helvetica").fontSize(10).fillColor("#2563EB").text(quotation.paymentLinkUrl, {
+      doc.moveDown(1.0);
+      
+      const btnX = doc.x;
+      const btnY = doc.y;
+      const btnW = 100;
+      const btnH = 22;
+      
+      doc.fillColor("#2563EB").roundedRect(btnX, btnY, btnW, btnH, 3).fill();
+      
+      doc.fillColor("#FFFFFF").font("Helvetica-Bold").fontSize(9);
+      doc.text("Pay Online Now", btnX, btnY + 7, {
+        width: btnW,
+        align: "center",
         link: quotation.paymentLinkUrl,
-        underline: true,
       });
-      doc.fillColor("black");
+      
+      doc.fillColor("black").font("Helvetica").fontSize(11);
+      doc.y = btnY + btnH + 12;
     }
 
     doc.moveDown(1.2);

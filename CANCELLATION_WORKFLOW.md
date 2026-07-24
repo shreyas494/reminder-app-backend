@@ -48,3 +48,10 @@ This document outlines the workflows, changes made, and operational rules for th
   * **Firm 1**: `[FinancialYear]-[4-Digit-Sequence]` (e.g. `26-27-0003`)
   * **Firm 2**: `[FinancialYear]-[4-Digit-Sequence]-F2` (e.g. `26-27-0003-F2`)
   * *The `-F2` suffix differentiates Firm 2's numbers from Firm 1's and prevents duplicate key clashes in the database.*
+
+---
+
+## 3. Interactive Payment Buttons in PDFs
+* Instead of printing the raw hyperlink text, the generated quotation PDFs (both downloaded and emailed) now feature a styled **Pay Online Now** graphical button.
+* Clicking the button redirects the user directly to the Razorpay checkout gateway.
+
