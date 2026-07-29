@@ -73,4 +73,10 @@ This document describes the changes made and how everything works in simple lang
   * Updated [NearExpiry.jsx](file:///d:/reminder-app/frontend/src/pages/NearExpiry.jsx) to navigate directly to `/quotations?firm=firm1` when loading the new draft.
   * Updated the state synchronization effect in [Quotations.jsx](file:///d:/reminder-app/frontend/src/pages/Quotations.jsx) to only wipe the active draft form if the selected firm has *actually changed*, avoiding state resets during same-firm mounts.
 
+---
+
+## 6. Client Info Tab Label Rename
+* The editor tab button labeled **Static Info** inside the Selected Quotation Record panel has been renamed to **Client Info** to make it clearer and more user-friendly.
+
+
 
