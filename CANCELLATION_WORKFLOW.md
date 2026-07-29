@@ -78,5 +78,11 @@ This document describes the changes made and how everything works in simple lang
 ## 6. Client Info Tab Label Rename
 * The editor tab button labeled **Static Info** inside the Selected Quotation Record panel has been renamed to **Client Info** to make it clearer and more user-friendly.
 
+---
+
+## 7. Dashboard Redirect Alert Type
+* When redirecting from the dashboard after creating a quotation, the notification is now shown as a browser modal alert popup (`window.alert`) instead of a green message box at the top of the page. This prevents the page from scrolling away from the draft view.
+
+
 
 
