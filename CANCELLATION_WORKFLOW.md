@@ -65,3 +65,12 @@ This document describes the changes made and how everything works in simple lang
 * Only the **All**, **Paid**, and **Unpaid** filter buttons are displayed.
 * GST and Non-GST tabs have been removed.
 
+---
+
+## 5. Dashboard Redirect Draft Fix
+* **Issue**: Creating a quotation from the Dashboard redirected to `/quotations` with the new draft ID. However, the lack of a firm query parameter triggered a URL default reset that cleared the draft details from the view on load.
+* **Fix**:
+  * Updated [NearExpiry.jsx](file:///d:/reminder-app/frontend/src/pages/NearExpiry.jsx) to navigate directly to `/quotations?firm=firm1` when loading the new draft.
+  * Updated the state synchronization effect in [Quotations.jsx](file:///d:/reminder-app/frontend/src/pages/Quotations.jsx) to only wipe the active draft form if the selected firm has *actually changed*, avoiding state resets during same-firm mounts.
+
+
