@@ -115,7 +115,7 @@ async function generateQuotationNumber(quotationType, firmKey = "firm1") {
   return `${fy}-${String(seq).padStart(4, "0")}${suffix}`;
 }
 
-const FALLBACK_LOGO_URL = "https://reminder-app-backend-u8wb.onrender.com/assets/company-logo.png";
+const FALLBACK_LOGO_URL = "https://reminder-app-backend-aaac.onrender.com/assets/company-logo.png";
 
 function resolveLogoUrl(value) {
   const raw = String(value || "").trim();
