@@ -80,8 +80,10 @@ This document describes the changes made and how everything works in simple lang
 
 ---
 
-## 7. Dashboard Redirect Alert Type
-* When redirecting from the dashboard after creating a quotation, the notification is now shown as a browser modal alert popup (`window.alert`) instead of a green message box at the top of the page. This prevents the page from scrolling away from the draft view.
+## 7. Global Popup Alerts for Quotations Page
+* All notifications, success messages, inputs validations, and operation errors on the Quotations page now show as standard browser modal alert popups (`window.alert`) instead of inline banners.
+* This removes page scrolling, keeps the user's cursor focused, and ensures that critical alerts are instantly visible to the user.
+
 
 
 
