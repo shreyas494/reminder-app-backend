@@ -57,3 +57,11 @@ This document describes the changes made and how everything works in simple lang
 * Instead of printing a long, raw website link (like `https://api.razorpay.com/...`) in the PDF:
 * The generated PDFs (both downloaded and emailed) now have a blue **Pay Online Now** button.
 * When clicked, this button opens the payment link directly in a web browser.
+
+---
+
+## 4. Simplified Record Filters
+* The sub-tabs under the "Quotation Records" list have been simplified.
+* Only the **All**, **Paid**, and **Unpaid** filter buttons are displayed.
+* GST and Non-GST tabs have been removed.
+
