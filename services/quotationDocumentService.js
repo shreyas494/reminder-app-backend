@@ -9,15 +9,23 @@ function formatDate(dateValue) {
   return date.toLocaleDateString("en-GB");
 }
 
+function resolvePreviewLogoUrl(url) {
+  const raw = String(url || "").trim();
+  if (!raw || raw.includes("yourdomain.com") || raw.includes("reminder-app-backend-u8wb.onrender.com")) {
+    return "https://reminder-app-backend-aaac.onrender.com/assets/company-logo.png";
+  }
+  return raw;
+}
+
 export function buildQuotationPreviewHtml(quotation) {
   const showGst = quotation.quotationType === "with-gst";
   const recipientLine = quotation.recipientName || "";
 
   return `
   <div style="max-width:760px;margin:0 auto;background:#ffffff;color:#111827;font-family:Arial,sans-serif;line-height:1.45;border:1px solid #dbe3ef;">
-    <div style="background:linear-gradient(130deg,#0f2c5c 0%,#1d4f91 100%);padding:16px 18px;display:flex;justify-content:space-between;align-items:flex-start;">
-      <div style="display:flex;align-items:flex-start;gap:12px;">
-        ${quotation.companyLogoUrl ? `<img src="${quotation.companyLogoUrl}" alt="logo" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:4px;padding:3px;"/>` : ""}
+    <div style="background:linear-gradient(130deg,#0f2c5c 0%,#1d4f91 100%);padding:16px 18px;display:flex;justify-content:space-between;align-items:center;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <img src="${resolvePreviewLogoUrl(quotation.companyLogoUrl)}" alt="logo" style="width:64px;height:64px;object-fit:contain;background:#fff;border-radius:4px;padding:3px;"/>
         <div>
           <div style="font-size:18px;font-weight:700;color:#ffffff;line-height:1.2;">${quotation.companyName}</div>
           <div style="font-size:11px;color:#d1ddf2;margin-top:4px;max-width:360px;">${quotation.companyAddress}</div>

@@ -110,6 +110,13 @@ This document describes the changes made and how everything works in simple lang
 * **Style Standardization**: Made both firm selector button backgrounds standard blue (`bg-indigo-600`) to maintain a clean and unified look.
 * **Query Parameter Preservation**: Updated navigation cleanup to redirect to `${location.pathname}${location.search}` instead of only `location.pathname` to ensure that query parameters (such as `?firm=firm2`) are retained in the URL when clearing state.
 
+---
+
+## 11. Fallback Logo Resolution & Alignment in Preview
+* Handled old/deprecated logo domains dynamically: if a loaded record contains the old Render host (`reminder-app-backend-u8wb.onrender.com`), it automatically resolves to the current active backend Render domain.
+* Updated vertical alignment of the logo image and company info text in the header to be centered (`align-items: center`), giving the header section a more balanced, standard, and professional look.
+
+
 
 
 
