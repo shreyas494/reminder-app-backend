@@ -116,6 +116,16 @@ This document describes the changes made and how everything works in simple lang
 * Handled old/deprecated logo domains dynamically: if a loaded record contains the old Render host (`reminder-app-backend-u8wb.onrender.com`), it automatically resolves to the current active backend Render domain.
 * Updated vertical alignment of the logo image and company info text in the header to be centered (`align-items: center`), giving the header section a more balanced, standard, and professional look.
 
+---
+
+## 12. Quotations Page Layout Ordering
+* Swapped the display order of sections on the Quotations page:
+  1. **Reminders (Create Quotation)**
+  2. **Selected Quotation Record** (details editor, action buttons, and document preview)
+  3. **Quotation Records** (table list of existing quotation records, moved to the bottom of the page)
+* This puts the manual draft creation and draft editing/preview screens side-by-side at the top, simplifying user flows.
+
+
 
 
 
