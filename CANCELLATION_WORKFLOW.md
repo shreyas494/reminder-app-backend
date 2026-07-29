@@ -90,6 +90,14 @@ This document describes the changes made and how everything works in simple lang
 * Standardized all validation warnings and submit errors inside the **Add / Edit Reminder Modal** (`AddReminderModal.jsx`) to display as browser modal alerts (`window.alert`).
 * If input validations fail (such as entering an 11-digit phone number or missing required fields), the warning pops up directly in front of the user instead of rendering as a red message banner inside the modal.
 
+---
+
+## 9. Backend-driven Reminder Search on Quotations Page
+* Moved the search filtering logic for reminders on the Quotations page from client-side to backend-side.
+* Handled the search query using a debounced hook (400ms timeout) that passes the keyword query to the backend as `/api/reminders?page=X&search=keyword`.
+* The backend does case-insensitive regex checks across all reminder fields, returning matching results across all paginated pages.
+
+
 
 
 

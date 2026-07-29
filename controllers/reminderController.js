@@ -109,6 +109,20 @@ export const getReminders = async (req, res) => {
 
   const query = { user: req.user.id };
 
+  if (req.query.search) {
+    const searchRegex = { $regex: req.query.search, $options: "i" };
+    query.$or = [
+      { clientName: searchRegex },
+      { contactPerson: searchRegex },
+      { projectName: searchRegex },
+      { domainName: searchRegex },
+      { email: searchRegex },
+      { mobile1: searchRegex },
+      { mobile2: searchRegex },
+      { serviceType: searchRegex },
+    ];
+  }
+
   if (req.query.clientName) {
     query.clientName = { $regex: req.query.clientName, $options: "i" };
   }
