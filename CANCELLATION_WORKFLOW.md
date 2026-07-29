@@ -84,6 +84,13 @@ This document describes the changes made and how everything works in simple lang
 * All notifications, success messages, inputs validations, and operation errors on the Quotations page now show as standard browser modal alert popups (`window.alert`) instead of inline banners.
 * This removes page scrolling, keeps the user's cursor focused, and ensures that critical alerts are instantly visible to the user.
 
+---
+
+## 8. Popup Alerts for Reminder Creation Modal
+* Standardized all validation warnings and submit errors inside the **Add / Edit Reminder Modal** (`AddReminderModal.jsx`) to display as browser modal alerts (`window.alert`).
+* If input validations fail (such as entering an 11-digit phone number or missing required fields), the warning pops up directly in front of the user instead of rendering as a red message banner inside the modal.
+
+
 
 
 
