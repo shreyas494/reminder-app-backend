@@ -108,6 +108,8 @@ This document describes the changes made and how everything works in simple lang
 * Upon selecting a firm, it creates the draft for that selected firm Key and redirects to `/quotations?firm=selectedFirmKey` with the newly created quotation open.
 * **Redirection Race Condition Fix**: Bypassed local selection resets and stale state batches by using query parameters directly to load the correct quotation record on redirects, ensuring the second firm's drafts load flawlessly.
 * **Style Standardization**: Made both firm selector button backgrounds standard blue (`bg-indigo-600`) to maintain a clean and unified look.
+* **Query Parameter Preservation**: Updated navigation cleanup to redirect to `${location.pathname}${location.search}` instead of only `location.pathname` to ensure that query parameters (such as `?firm=firm2`) are retained in the URL when clearing state.
+
 
 
 
