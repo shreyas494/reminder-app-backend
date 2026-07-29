@@ -97,6 +97,17 @@ This document describes the changes made and how everything works in simple lang
 * Handled the search query using a debounced hook (400ms timeout) that passes the keyword query to the backend as `/api/reminders?page=X&search=keyword`.
 * The backend does case-insensitive regex checks across all reminder fields, returning matching results across all paginated pages.
 
+---
+
+## 10. Dashboard Firm Selection Modal
+* Clicking the quotation icon for a reminder on the Dashboard/Near-Expiry page now displays a modal prompt asking the user to select the firm for the quotation draft.
+* Provides options for:
+  * **Lemonade Software Developers**
+  * **Orange Tech Solutions**
+  * **Cancel**
+* Upon selecting a firm, it creates the draft for that selected firm Key and redirects to `/quotations?firm=selectedFirmKey` with the newly created quotation open.
+
+
 
 
 
