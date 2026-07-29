@@ -135,10 +135,10 @@ export const getReminders = async (req, res) => {
 
   const reminders = await Reminder.find(query);
 
-  // ✅ SORT BY FINAL EXPIRY (MOST DUE FIRST)
+  // ✅ SORT BY CREATED AT (LATEST CREATED FIRST)
   const sorted = reminders
     .map((r) => r.toObject())
-    .sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   const total = sorted.length;
   const totalPages = Math.ceil(total / limit);

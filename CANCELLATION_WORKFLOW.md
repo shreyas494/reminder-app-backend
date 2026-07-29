@@ -125,6 +125,13 @@ This document describes the changes made and how everything works in simple lang
   3. **Quotation Records** (table list of existing quotation records, moved to the bottom of the page)
 * This puts the manual draft creation and draft editing/preview screens side-by-side at the top, simplifying user flows.
 
+---
+
+## 13. Reminder Sorting Order (Latest First)
+* Updated the `getReminders` backend controller to sort reminders by creation date in descending order (`createdAt` descending) instead of sorting by `expiryDate` in ascending order.
+* This ensures that when a new reminder is added, it is immediately displayed at the top of the first page of the Reminders list.
+
+
 
 
 
