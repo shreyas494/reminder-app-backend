@@ -130,6 +130,15 @@ export const createBillFromQuotation = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
+    // Automatically mark quotation as paid upon bill generation
+    quotation.paymentStatus = "paid";
+    quotation.amountPaid = quotation.totalAmount;
+    quotation.balanceDue = 0;
+    if (!quotation.paidAt) {
+      quotation.paidAt = new Date();
+    }
+    await quotation.save();
+
     const firmKey = quotation.firmKey || "firm1";
     const billType = quotation.quotationType === "without-gst" ? "without-gst" : "with-gst";
     const gstPercent = Number(quotation.gstPercent || 0);
