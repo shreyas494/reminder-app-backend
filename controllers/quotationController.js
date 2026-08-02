@@ -385,6 +385,23 @@ export const createQuotationFromReminder = async (req, res) => {
       });
     }
 
+    const existingQuotation = await Quotation.findOne({
+      user: req.user.id,
+      reminder: reminder._id,
+      firmKey,
+    });
+
+    if (existingQuotation) {
+      return res.status(200).json({
+        message: "Existing quotation record loaded.",
+        quotation: existingQuotation,
+        isExisting: true,
+        timing: createRequestTimingMeta(requestStartMs, {
+          totalExecMs: calculateElapsedMs(quoteStartHr),
+        }),
+      });
+    }
+
     const gstPercent = Number(process.env.QUOTATION_GST_PERCENT || 18);
     const amounts = deriveAmounts(reminder.amount, quotationType, gstPercent);
     const defaults = getCompanyDefaults(quotationType, firmKey);

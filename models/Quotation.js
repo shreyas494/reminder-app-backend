@@ -84,4 +84,6 @@ const quotationSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+quotationSchema.index({ user: 1, reminder: 1, firmKey: 1 }, { unique: true });
+
 export default mongoose.model("Quotation", quotationSchema);
