@@ -24,20 +24,22 @@ function getCurrentFinancialYear() {
   return `${startYearShort}-${endYearShort}`;
 }
 
-function getBillSeriesConfig(billType) {
+function getBillSeriesConfig(billType, firmKey = "firm1") {
   const isGst = billType === "with-gst";
   const fy = getCurrentFinancialYear();
+  const firmSuffix = firmKey === "firm2" ? "-firm2" : "-firm1";
   return {
-    counterName: isGst ? `bill-number-gst-${fy}` : `bill-number-non-gst-${fy}`,
+    counterName: isGst ? `bill-number-gst-${fy}${firmSuffix}` : `bill-number-non-gst-${fy}${firmSuffix}`,
     prefix: isGst
       ? (process.env.BILL_PREFIX_GST || process.env.BILL_PREFIX || "GST-BILL")
       : (process.env.BILL_PREFIX_NON_GST || process.env.BILL_PREFIX || "NGST-BILL"),
     fy,
+    firmKey,
   };
 }
 
-async function generateBillNumber(billType) {
-  const { counterName, prefix, fy } = getBillSeriesConfig(billType);
+async function generateBillNumber(billType, firmKey = "firm1") {
+  const { counterName, prefix, fy } = getBillSeriesConfig(billType, firmKey);
   const counter = await Counter.findOneAndUpdate(
     { name: counterName },
     { $inc: { seq: 1 } },
@@ -45,7 +47,8 @@ async function generateBillNumber(billType) {
   );
 
   const seq = Number(counter?.seq || 1);
-  return `${fy}-${String(seq).padStart(4, "0")}`;
+  const typeDesignation = firmKey === "firm2" ? "-F2" : "";
+  return `${fy}-${String(seq).padStart(4, "0")}${typeDesignation}`;
 }
 
 function normalizeServiceType(serviceType) {
@@ -126,22 +129,26 @@ export const createBillFromQuotation = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
-    const amountPaid = Number(quotation.amountPaid || quotation.totalAmount || 0);
-    const isPaid = quotation.paymentStatus === "paid" || amountPaid >= Number(quotation.totalAmount || 0);
-
-    if (!isPaid) {
-      return res.status(400).json({ message: "Bill can be generated only for paid quotations" });
+    const existingBill = await Bill.findOne({ quotation: quotation._id, user: req.user.id });
+    if (existingBill) {
+      return res.status(200).json({
+        message: "Existing bill found for this quotation",
+        bill: existingBill,
+        isExisting: true,
+      });
     }
 
+    const firmKey = quotation.firmKey || "firm1";
     const billType = quotation.quotationType === "without-gst" ? "without-gst" : "with-gst";
     const gstPercent = Number(quotation.gstPercent || 0);
     const amounts = deriveAmounts(quotation.amount, billType, gstPercent);
-    const billNumber = await generateBillNumber(billType);
+    const billNumber = await generateBillNumber(billType, firmKey);
     const serviceType = normalizeServiceType(quotation.serviceType || quotation.serviceDescription);
 
     const bill = await Bill.create({
       user: req.user.id,
       quotation: quotation._id,
+      firmKey,
       billNumber,
       billType,
       billDate: new Date(),
@@ -162,7 +169,7 @@ export const createBillFromQuotation = async (req, res) => {
       totalAmount: amounts.totalAmount,
 
       paymentStatus: "paid",
-      amountPaid: amountPaid || amounts.totalAmount,
+      amountPaid: quotation.amountPaid || amounts.totalAmount,
       balanceDue: 0,
 
       senderName: quotation.senderName || "",
@@ -174,13 +181,13 @@ export const createBillFromQuotation = async (req, res) => {
       companyTagline: quotation.companyTagline || "",
       companyLogoUrl: quotation.companyLogoUrl || "",
 
-      reviewed: false,
-      reviewedAt: null,
+      reviewed: true,
+      reviewedAt: new Date(),
       sent: false,
       sentAt: null,
     });
 
-    res.status(201).json(bill);
+    res.status(201).json({ bill, isExisting: false });
   } catch (err) {
     console.error("[BILL] Create from quotation failed:", err?.message || err);
     res.status(500).json({ message: "Failed to create bill" });

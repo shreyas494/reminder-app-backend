@@ -12,6 +12,11 @@ const billSchema = new mongoose.Schema(
       ref: "Quotation",
       required: true,
     },
+    firmKey: {
+      type: String,
+      enum: ["firm1", "firm2"],
+      default: "firm1",
+    },
     billNumber: {
       type: String,
       required: true,
