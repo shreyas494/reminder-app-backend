@@ -359,7 +359,9 @@ export const createQuotationFromReminder = async (req, res) => {
   const quoteStartHr = process.hrtime.bigint();
   try {
     const { reminderId } = req.params;
-    const { quotationType = "with-gst", firmKey = "firm1" } = req.body;
+    const { firmKey = "firm1" } = req.body;
+    const defaultQuotationType = firmKey === "firm2" ? "without-gst" : "with-gst";
+    const quotationType = req.body.quotationType || defaultQuotationType;
 
     if (!["with-gst", "without-gst"].includes(quotationType)) {
       return res.status(400).json({
