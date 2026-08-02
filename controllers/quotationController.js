@@ -397,9 +397,7 @@ export const createQuotationFromReminder = async (req, res) => {
         message: "Existing quotation record loaded.",
         quotation: existingQuotation,
         isExisting: true,
-        timing: createRequestTimingMeta(requestStartMs, {
-          totalExecMs: calculateElapsedMs(quoteStartHr),
-        }),
+        timing: createRequestTimingMeta(requestStartMs),
       });
     }
 
