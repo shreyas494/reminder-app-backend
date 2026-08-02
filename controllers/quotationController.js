@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Quotation from "../models/Quotation.js";
 import Counter from "../models/Counter.js";
 import Reminder from "../models/Reminder.js";
@@ -516,9 +517,38 @@ export const getQuotationBenchmarkSummary = async (req, res) => {
   }
 };
 
+async function cleanupDuplicateQuotations(userId) {
+  try {
+    const duplicates = await Quotation.aggregate([
+      { $match: { user: new mongoose.Types.ObjectId(userId) } },
+      {
+        $group: {
+          _id: { reminder: "$reminder", firmKey: { $ifNull: ["$firmKey", "firm1"] } },
+          count: { $sum: 1 },
+          docs: { $push: { id: "$_id", updatedAt: "$updatedAt" } },
+        },
+      },
+      { $match: { count: { $gt: 1 } } },
+    ]);
+
+    for (const group of duplicates) {
+      group.docs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      const [keep, ...remove] = group.docs;
+      const idsToRemove = remove.map((d) => d.id);
+      if (idsToRemove.length > 0) {
+        await Quotation.deleteMany({ _id: { $in: idsToRemove } });
+        console.log(`[QUOTATION CLEANUP] Removed ${idsToRemove.length} duplicate quotation records for reminder ${group._id.reminder}`);
+      }
+    }
+  } catch (err) {
+    console.warn("[QUOTATION CLEANUP] Deduplication skipped:", err?.message || err);
+  }
+}
+
 export const getQuotations = async (req, res) => {
   const requestStartMs = Date.now();
   try {
+    await cleanupDuplicateQuotations(req.user.id);
     const page = Number(req.query.page) || 1;
     const limit = 10;
     const skip = (page - 1) * limit;
@@ -654,72 +684,50 @@ export const updateQuotation = async (req, res) => {
       "companyLogoUrl",
     ];
 
-    const quotationData = existingQuotation.toObject();
-    delete quotationData._id;
-    delete quotationData.__v;
-    delete quotationData.createdAt;
-    delete quotationData.updatedAt;
-
-    let hasAnyChange = false;
-
-    for (const field of allowedFields) {
-      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
-        const incomingValue = req.body[field];
-        if (hasQuotationFieldChanged(field, quotationData[field], incomingValue)) {
-          hasAnyChange = true;
-        }
-        quotationData[field] = incomingValue;
-      }
-    }
-
-    if (existingQuotation.quotationType !== quotationData.quotationType) {
-      const newDefaults = getCompanyDefaults(quotationData.quotationType, existingQuotation.firmKey || "firm1");
-      for (const field of ["companyName", "companyAddress", "companyRegistration", "companyPhone", "companyTagline", "companyLogoUrl"]) {
-        if (!Object.prototype.hasOwnProperty.call(req.body, field)) {
-          quotationData[field] = newDefaults[field];
-        }
-      }
-    }
-
-    if (!hasAnyChange) {
-      console.log("[QUOTATION] No field changes detected; creating a new version anyway as requested");
-    }
-
-    if (!["with-gst", "without-gst"].includes(quotationData.quotationType)) {
+    const nextQuotationType = req.body.quotationType || existingQuotation.quotationType;
+    if (!["with-gst", "without-gst"].includes(nextQuotationType)) {
       return res.status(400).json({
         message: "Invalid quotation type",
         timing: createRequestTimingMeta(requestStartMs),
       });
     }
 
-    quotationData.serviceType = normalizeServiceType(quotationData.serviceType);
-    quotationData.subject = subjectByServiceType(quotationData.serviceType);
+    if (existingQuotation.quotationType !== nextQuotationType) {
+      const newDefaults = getCompanyDefaults(nextQuotationType, existingQuotation.firmKey || "firm1");
+      for (const field of ["companyName", "companyAddress", "companyRegistration", "companyPhone", "companyTagline", "companyLogoUrl"]) {
+        if (!Object.prototype.hasOwnProperty.call(req.body, field)) {
+          existingQuotation[field] = newDefaults[field];
+        }
+      }
+    }
 
-    const gstPercent = Number(quotationData.gstPercent || 0);
-    const amounts = deriveAmounts(quotationData.amount, quotationData.quotationType, gstPercent);
-    quotationData.amount = amounts.amount;
-    quotationData.gstAmount = amounts.gstAmount;
-    quotationData.totalAmount = amounts.totalAmount;
+    for (const field of allowedFields) {
+      if (Object.prototype.hasOwnProperty.call(req.body, field)) {
+        existingQuotation[field] = req.body[field];
+      }
+    }
 
-    quotationData.firmKey = existingQuotation.firmKey || "firm1";
-    quotationData.quotationNumber = await generateQuotationNumber(quotationData.quotationType, quotationData.firmKey);
-    quotationData.amountPaid = 0;
-    quotationData.paidAt = null;
-    quotationData.paymentProvider = "razorpay";
-    quotationData.paymentLinkId = "";
-    quotationData.paymentLinkUrl = "";
-    quotationData.paymentLinkedAt = null;
-    const paymentState = derivePaymentState(quotationData.totalAmount, quotationData.amountPaid);
-    quotationData.paymentStatus = paymentState.paymentStatus;
-    quotationData.balanceDue = paymentState.balanceDue;
-    quotationData.reviewed = true;
-    quotationData.reviewedAt = new Date();
-    quotationData.sent = false;
-    quotationData.sentAt = null;
+    existingQuotation.serviceType = normalizeServiceType(existingQuotation.serviceType);
+    if (!req.body.subject) {
+      existingQuotation.subject = subjectByServiceType(existingQuotation.serviceType);
+    }
 
-    const newQuotationVersion = await Quotation.create(quotationData);
-    return res.status(201).json({
-      quotation: newQuotationVersion,
+    const gstPercent = Number(existingQuotation.gstPercent || 0);
+    const amounts = deriveAmounts(existingQuotation.amount, existingQuotation.quotationType, gstPercent);
+    existingQuotation.amount = amounts.amount;
+    existingQuotation.gstAmount = amounts.gstAmount;
+    existingQuotation.totalAmount = amounts.totalAmount;
+
+    const paymentState = derivePaymentState(existingQuotation.totalAmount, existingQuotation.amountPaid || 0);
+    existingQuotation.paymentStatus = paymentState.paymentStatus;
+    existingQuotation.balanceDue = paymentState.balanceDue;
+    existingQuotation.reviewed = true;
+    existingQuotation.reviewedAt = new Date();
+
+    await existingQuotation.save();
+
+    return res.status(200).json({
+      quotation: existingQuotation,
       timing: createRequestTimingMeta(requestStartMs),
     });
   } catch (err) {
