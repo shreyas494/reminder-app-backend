@@ -69,8 +69,8 @@ const quotationSchema = new mongoose.Schema(
     companyTagline: { type: String, default: "" },
     companyLogoUrl: { type: String, default: "" },
 
-    reviewed: { type: Boolean, default: false },
-    reviewedAt: { type: Date, default: null },
+    reviewed: { type: Boolean, default: true },
+    reviewedAt: { type: Date, default: Date.now },
 
     sent: { type: Boolean, default: false },
     sentAt: { type: Date, default: null },

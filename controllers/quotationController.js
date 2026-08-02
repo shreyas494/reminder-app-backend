@@ -444,8 +444,8 @@ export const createQuotationFromReminder = async (req, res) => {
       paidAt: null,
 
       ...defaults,
-      reviewed: false,
-      reviewedAt: null,
+      reviewed: true,
+      reviewedAt: new Date(),
       sent: false,
       sentAt: null,
     });
