@@ -700,6 +700,9 @@ export const updateQuotation = async (req, res) => {
       }
     }
 
+    const previousAmount = existingQuotation.amount;
+    const amountChanged = req.body.amount !== undefined && Number(req.body.amount) !== Number(previousAmount);
+
     for (const field of allowedFields) {
       if (Object.prototype.hasOwnProperty.call(req.body, field)) {
         existingQuotation[field] = req.body[field];
@@ -717,9 +720,18 @@ export const updateQuotation = async (req, res) => {
     existingQuotation.gstAmount = amounts.gstAmount;
     existingQuotation.totalAmount = amounts.totalAmount;
 
-    const paymentState = derivePaymentState(existingQuotation.totalAmount, existingQuotation.amountPaid || 0);
-    existingQuotation.paymentStatus = paymentState.paymentStatus;
-    existingQuotation.balanceDue = paymentState.balanceDue;
+    if (amountChanged) {
+      existingQuotation.amountPaid = 0;
+      existingQuotation.paymentStatus = "unpaid";
+      existingQuotation.balanceDue = amounts.totalAmount;
+      existingQuotation.paymentLinkId = "";
+      existingQuotation.paymentLinkUrl = "";
+      existingQuotation.paidAt = null;
+    } else {
+      const paymentState = derivePaymentState(existingQuotation.totalAmount, existingQuotation.amountPaid || 0);
+      existingQuotation.paymentStatus = paymentState.paymentStatus;
+      existingQuotation.balanceDue = paymentState.balanceDue;
+    }
     existingQuotation.reviewed = true;
     existingQuotation.reviewedAt = new Date();
 
@@ -733,8 +745,11 @@ export const updateQuotation = async (req, res) => {
         linkedBill.gstPercent = existingQuotation.gstPercent;
         linkedBill.gstAmount = existingQuotation.gstAmount;
         linkedBill.totalAmount = existingQuotation.totalAmount;
-        linkedBill.amountPaid = existingQuotation.totalAmount;
-        linkedBill.balanceDue = 0;
+        if (amountChanged) {
+          linkedBill.amountPaid = 0;
+          linkedBill.paymentStatus = "unpaid";
+          linkedBill.balanceDue = existingQuotation.totalAmount;
+        }
         linkedBill.serviceType = existingQuotation.serviceType;
         linkedBill.clientEmail = existingQuotation.clientEmail || "";
         linkedBill.recipientName = existingQuotation.recipientName || "";
