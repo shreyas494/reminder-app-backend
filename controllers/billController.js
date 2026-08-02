@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Bill from "../models/Bill.js";
 import Counter from "../models/Counter.js";
 import Quotation from "../models/Quotation.js";
@@ -194,13 +195,51 @@ export const createBillFromQuotation = async (req, res) => {
   }
 };
 
+async function cleanupDuplicateBills(userId) {
+  try {
+    const duplicates = await Bill.aggregate([
+      { $match: { user: new mongoose.Types.ObjectId(userId) } },
+      {
+        $group: {
+          _id: { quotation: "$quotation", firmKey: { $ifNull: ["$firmKey", "firm1"] } },
+          count: { $sum: 1 },
+          docs: { $push: { id: "$_id", updatedAt: "$updatedAt" } },
+        },
+      },
+      { $match: { count: { $gt: 1 } } },
+    ]);
+
+    for (const group of duplicates) {
+      group.docs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+      const [keep, ...remove] = group.docs;
+      const idsToRemove = remove.map((d) => d.id);
+      if (idsToRemove.length > 0) {
+        await Bill.deleteMany({ _id: { $in: idsToRemove } });
+        console.log(`[BILL CLEANUP] Removed ${idsToRemove.length} duplicate bill records for quotation ${group._id.quotation}`);
+      }
+    }
+  } catch (err) {
+    console.warn("[BILL CLEANUP] Deduplication skipped:", err?.message || err);
+  }
+}
+
 export const getBills = async (req, res) => {
   try {
+    await cleanupDuplicateBills(req.user.id);
     const page = Number(req.query.page) || 1;
     const limit = 10;
     const skip = (page - 1) * limit;
 
     const query = { user: req.user.id };
+
+    const firmFilter = String(req.query.firmKey || "").trim();
+    if (["firm1", "firm2"].includes(firmFilter)) {
+      if (firmFilter === "firm1") {
+        query.firmKey = { $in: ["firm1", null, undefined] };
+      } else {
+        query.firmKey = firmFilter;
+      }
+    }
 
     const total = await Bill.countDocuments(query);
     const data = await Bill.find(query)
