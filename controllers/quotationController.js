@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import Quotation from "../models/Quotation.js";
+import Bill from "../models/Bill.js";
 import Counter from "../models/Counter.js";
 import Reminder from "../models/Reminder.js";
 import { sendEmail } from "../services/emailService.js";
@@ -723,6 +724,27 @@ export const updateQuotation = async (req, res) => {
     existingQuotation.reviewedAt = new Date();
 
     await existingQuotation.save();
+
+    // Automatically sync linked bill if one exists
+    try {
+      const linkedBill = await Bill.findOne({ quotation: existingQuotation._id, user: req.user.id });
+      if (linkedBill) {
+        linkedBill.amount = existingQuotation.amount;
+        linkedBill.gstPercent = existingQuotation.gstPercent;
+        linkedBill.gstAmount = existingQuotation.gstAmount;
+        linkedBill.totalAmount = existingQuotation.totalAmount;
+        linkedBill.amountPaid = existingQuotation.totalAmount;
+        linkedBill.balanceDue = 0;
+        linkedBill.serviceType = existingQuotation.serviceType;
+        linkedBill.clientEmail = existingQuotation.clientEmail || "";
+        linkedBill.recipientName = existingQuotation.recipientName || "";
+        linkedBill.recipientAddress = existingQuotation.recipientAddress || "";
+        await linkedBill.save();
+        console.log(`[QUOTATION UPDATE] Synced updated amount (${existingQuotation.totalAmount}) to linked bill ${linkedBill._id}`);
+      }
+    } catch (syncErr) {
+      console.warn("[QUOTATION UPDATE] Linked bill sync warning:", syncErr?.message || syncErr);
+    }
 
     return res.status(200).json({
       quotation: existingQuotation,

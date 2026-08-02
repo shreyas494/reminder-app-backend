@@ -130,21 +130,50 @@ export const createBillFromQuotation = async (req, res) => {
       return res.status(404).json({ message: "Quotation not found" });
     }
 
-    const existingBill = await Bill.findOne({ quotation: quotation._id, user: req.user.id });
-    if (existingBill) {
-      return res.status(200).json({
-        message: "Existing bill found for this quotation",
-        bill: existingBill,
-        isExisting: true,
-      });
-    }
-
     const firmKey = quotation.firmKey || "firm1";
     const billType = quotation.quotationType === "without-gst" ? "without-gst" : "with-gst";
     const gstPercent = Number(quotation.gstPercent || 0);
     const amounts = deriveAmounts(quotation.amount, billType, gstPercent);
-    const billNumber = await generateBillNumber(billType, firmKey);
     const serviceType = normalizeServiceType(quotation.serviceType || quotation.serviceDescription);
+
+    const existingBill = await Bill.findOne({ quotation: quotation._id, user: req.user.id });
+    if (existingBill) {
+      existingBill.firmKey = firmKey;
+      existingBill.billType = billType;
+      existingBill.serviceType = serviceType;
+      existingBill.clientEmail = quotation.clientEmail || "";
+      existingBill.recipientName = quotation.recipientName || "";
+      existingBill.recipientAddress = quotation.recipientAddress || "";
+      existingBill.subject = subjectByServiceType(serviceType);
+      existingBill.serviceDescription = serviceDescriptionByType(serviceType);
+      existingBill.amount = amounts.amount;
+      existingBill.gstPercent = gstPercent;
+      existingBill.gstAmount = amounts.gstAmount;
+      existingBill.totalAmount = amounts.totalAmount;
+      existingBill.amountPaid = quotation.amountPaid || amounts.totalAmount;
+      existingBill.balanceDue = 0;
+      existingBill.senderName = quotation.senderName || "";
+      existingBill.senderPhone = quotation.senderPhone || "";
+      existingBill.companyName = quotation.companyName || "";
+      existingBill.companyAddress = quotation.companyAddress || "";
+      existingBill.companyRegistration = quotation.companyRegistration || "";
+      existingBill.companyPhone = quotation.companyPhone || "";
+      existingBill.companyTagline = quotation.companyTagline || "";
+      existingBill.companyLogoUrl = quotation.companyLogoUrl || "";
+      existingBill.reviewed = true;
+      existingBill.reviewedAt = new Date();
+
+      await existingBill.save();
+
+      return res.status(200).json({
+        message: "Existing bill updated with latest quotation details",
+        bill: existingBill,
+        isExisting: true,
+        isUpdated: true,
+      });
+    }
+
+    const billNumber = await generateBillNumber(billType, firmKey);
 
     const bill = await Bill.create({
       user: req.user.id,
