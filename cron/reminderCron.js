@@ -91,11 +91,11 @@ ${statusLine}
         }
       }
 
-      if (r.email) {
+      if (r.email && String(r.email).trim()) {
         try {
           console.log(`[CRON][EMAIL] Sending ${r._id} -> ${r.email}`);
           const emailResult = await sendEmail({
-            to: r.email,
+            to: String(r.email).trim(),
             subject: noticeTitle,
             text: message,
           });
@@ -108,6 +108,8 @@ ${statusLine}
         } catch (err) {
           console.error(`[CRON][EMAIL] Failed ${r._id}:`, err?.message || err);
         }
+      } else {
+        console.log(`[CRON][EMAIL] Skipped ${r._id} (no email address provided)`);
       }
 
       const updateFields = {};
