@@ -23,6 +23,8 @@ const reminderSchema = new mongoose.Schema(
       trim: true,
       required: true,
     },
+    domainProvider: { type: String, default: "" },
+    hostingProvider: { type: String, default: "" },
     domainName: { type: String },
 
     /* ================= DATES ================= */

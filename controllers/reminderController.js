@@ -21,6 +21,8 @@ export const createReminder = async (req, res) => {
       email,
       projectName,
       serviceType,
+      domainProvider,
+      hostingProvider,
       domainName,
       activationDate,
       expiryDate,
@@ -70,6 +72,8 @@ export const createReminder = async (req, res) => {
       email,
       projectName,
       serviceType: normalizeServiceType(serviceType),
+      domainProvider: String(domainProvider || "").trim(),
+      hostingProvider: String(hostingProvider || "").trim(),
       domainName,
       activationDate: activation,
       expiryDate: expiry,
@@ -283,6 +287,8 @@ export const updateReminder = async (req, res) => {
       email,
       projectName,
       serviceType,
+      domainProvider,
+      hostingProvider,
       domainName,
       amount,
       recurringEnabled,
@@ -300,6 +306,8 @@ export const updateReminder = async (req, res) => {
     if (email !== undefined) reminder.email = email;
     if (projectName !== undefined) reminder.projectName = projectName;
     if (serviceType !== undefined) reminder.serviceType = normalizeServiceType(serviceType);
+    if (domainProvider !== undefined) reminder.domainProvider = domainProvider;
+    if (hostingProvider !== undefined) reminder.hostingProvider = hostingProvider;
     if (domainName !== undefined) reminder.domainName = domainName;
     if (amount !== undefined) reminder.amount = amount;
 
