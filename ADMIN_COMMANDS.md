@@ -1,77 +1,58 @@
-# 🛠️ Administrative & Operational Command Reference
+# 📜 Simple Guide for Running Commands
 
-Quick reference guide for database management, data backups, cleanup tasks, and local development commands.
+This guide shows you **where to open your terminal** and **what each command does** in simple language.
 
 ---
 
-## 💾 1. Database & Backup Commands (Run inside `backend/` directory)
+## 📁 SECTION 1: Database Commands
 
-First navigate to backend directory:
+👉 **First, open your terminal and go to the backend folder:**
 ```bash
 cd backend
 ```
 
-| Task | Command | Description |
-| :--- | :--- | :--- |
-| **Backup Database** | `npm run backup` | Connects to MongoDB and exports all 6 collections (`users`, `reminders`, `quotations`, `bills`, `servicetypes`, `counters`) into a timestamped JSON folder inside `backend/backups/`. |
-| **Restore Latest Backup** | `npm run restore` | Restores all database collections from the **most recent** local backup folder. |
-| **Restore Specific Backup** | `npm run restore backups/backup_20260804121356` | Restores database collections from a **specific** backup folder path. |
-| **Clear Dummy Emails** | `npm run clear-dummy-emails` | Replaces all dummy `"a@b.c"` email addresses with empty strings (`""`) across Reminders, Quotations, and Bills. |
-| **Wipe Test Data** | `npm run clear-data` | Deletes all Reminders, Quotations, Bills, and Counters while **keeping Users and Service Types intact**. |
+| # | What you want to do | Command to type | What it actually does |
+| :-: | :--- | :--- | :--- |
+| 1 | **Take a Backup** | `npm run backup` | Saves a full copy of all your database records (reminders, quotations, bills, users, services) into a new folder inside `backend/backups/`. |
+| 2 | **Restore Latest Backup** | `npm run restore` | Restores all your database records using the **most recent** backup folder. |
+| 3 | **Restore Specific Backup** | `npm run restore backups/backup_20260804121356` | Restores your database records using a **specific** old backup folder name. |
+| 4 | **Remove Fake `a@b.c` Emails** | `npm run clear-dummy-emails` | Replaces all dummy `a@b.c` emails with blank empty fields across reminders, quotations, and bills. |
+| 5 | **Delete All Test Data** | `npm run clear-data` | Deletes all test reminders, quotations, and bills, while **keeping your login user accounts and Service Types safe**. |
 
 ---
 
-## 🚀 2. Local Development Commands
+## 💻 SECTION 2: Starting the App on Your Computer
 
-### Backend Server
+### 1. Start Backend Server
+👉 **Where to type:** inside `backend` folder (`cd backend`)
 ```bash
-cd backend
 npm run dev
 ```
-- Starts the Express backend API server locally (defaults to port `5000` with hot-reloading).
+*What it does:* Starts the backend server so the database and APIs can receive requests.
 
-### Frontend Web App
+### 2. Start Frontend Website
+👉 **Where to type:** inside `frontend` folder (`cd frontend`)
 ```bash
-cd frontend
 npm run dev
 ```
-- Starts the Vite frontend React app locally (defaults to `http://localhost:5173`).
+*What it does:* Starts your web browser application on `http://localhost:5173`.
 
 ---
 
-## 🐙 3. Git Deployment Commands
+## ☁️ SECTION 3: Saving Code to GitHub
 
-### Push Backend Changes
+### 1. Save Backend Changes to GitHub
+👉 **Where to type:** inside `backend` folder (`cd backend`)
 ```bash
-cd backend
 git add .
-git commit -m "Descriptive message"
+git commit -m "Saved backend updates"
 git push
 ```
 
-### Push Frontend Changes
+### 2. Save Frontend Changes to GitHub
+👉 **Where to type:** inside `frontend` folder (`cd frontend`)
 ```bash
-cd frontend
 git add .
-git commit -m "Descriptive message"
+git commit -m "Saved frontend updates"
 git push
-```
-
----
-
-## 📑 4. MongoDB Shell / Compass Queries (Alternative Manual Queries)
-
-### Clear Dummy Emails (`mongosh` / Compass Query)
-```javascript
-db.reminders.updateMany({ email: /^a@b\.c$/i }, { $set: { email: "" } });
-db.quotations.updateMany({ clientEmail: /^a@b\.c$/i }, { $set: { clientEmail: "" } });
-db.bills.updateMany({ clientEmail: /^a@b\.c$/i }, { $set: { clientEmail: "" } });
-```
-
-### Wipe Transactional Data (`mongosh` / Compass Query)
-```javascript
-db.reminders.deleteMany({});
-db.quotations.deleteMany({});
-db.bills.deleteMany({});
-db.counters.deleteMany({});
 ```
