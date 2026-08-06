@@ -166,10 +166,6 @@ export const getNearExpiryReminders = async (req, res) => {
     { $set: { status: "expired" } }
   ).catch(() => {});
 
-  const page = Number(req.query.page) || 1;
-  const limit = 10;
-  const skip = (page - 1) * limit;
-
   const start = new Date();
   start.setHours(0, 0, 0, 0);
 
@@ -195,18 +191,16 @@ export const getNearExpiryReminders = async (req, res) => {
 
   const [data, total] = await Promise.all([
     Reminder.find(query)
-      .select("clientName contactPerson mobile1 mobile2 email projectName domainName expiryDate amount renewals")
+      .select("clientName contactPerson mobile1 mobile2 email projectName domainName domainProvider hostingProvider expiryDate amount renewals status")
       .lean()
-      .sort({ expiryDate: 1 })
-      .skip(skip)
-      .limit(limit),
+      .sort({ expiryDate: 1 }),
     Reminder.countDocuments(query),
   ]);
 
   res.json({
     data,
-    page,
-    totalPages: Math.max(1, Math.ceil(total / limit)),
+    page: 1,
+    totalPages: 1,
     total,
   });
 };
