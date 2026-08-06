@@ -399,7 +399,7 @@ export const reactivateReminder = async (req, res) => {
 export const getReminderSuggestions = async (req, res) => {
   try {
     const reminders = await Reminder.find({ user: req.user.id })
-      .select("clientName contactPerson mobile1 mobile2 email domainProvider hostingProvider amount")
+      .select("clientName contactPerson projectName mobile1 mobile2 email domainProvider hostingProvider amount")
       .lean();
 
     const distinct = (arr) => Array.from(new Set(arr.filter((v) => v !== null && v !== undefined && String(v).trim() !== "")));
@@ -422,6 +422,7 @@ export const getReminderSuggestions = async (req, res) => {
     res.json({
       clientNames: distinct(reminders.map((r) => r.clientName)),
       contactPersons: distinct(reminders.map((r) => r.contactPerson)),
+      projectNames: distinct(reminders.map((r) => r.projectName)),
       mobiles1: distinct(reminders.map((r) => r.mobile1)),
       mobiles2: distinct(reminders.map((r) => r.mobile2)),
       emails: distinct(reminders.map((r) => r.email)),
