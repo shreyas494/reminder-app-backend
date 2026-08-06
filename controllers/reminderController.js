@@ -392,3 +392,46 @@ export const reactivateReminder = async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 };
+
+/* =====================================================
+   GET REMINDER AUTO-COMPLETE SUGGESTIONS
+   ===================================================== */
+export const getReminderSuggestions = async (req, res) => {
+  try {
+    const reminders = await Reminder.find({ user: req.user.id })
+      .select("clientName contactPerson mobile1 mobile2 email domainProvider hostingProvider amount")
+      .lean();
+
+    const distinct = (arr) => Array.from(new Set(arr.filter((v) => v !== null && v !== undefined && String(v).trim() !== "")));
+
+    const clientProfiles = {};
+    reminders.forEach((r) => {
+      const cName = String(r.clientName || "").trim();
+      if (cName && !clientProfiles[cName]) {
+        clientProfiles[cName] = {
+          contactPerson: r.contactPerson || "",
+          mobile1: r.mobile1 || "",
+          mobile2: r.mobile2 || "",
+          email: r.email || "",
+          domainProvider: r.domainProvider || "",
+          hostingProvider: r.hostingProvider || "",
+        };
+      }
+    });
+
+    res.json({
+      clientNames: distinct(reminders.map((r) => r.clientName)),
+      contactPersons: distinct(reminders.map((r) => r.contactPerson)),
+      mobiles1: distinct(reminders.map((r) => r.mobile1)),
+      mobiles2: distinct(reminders.map((r) => r.mobile2)),
+      emails: distinct(reminders.map((r) => r.email)),
+      domainProviders: distinct(reminders.map((r) => r.domainProvider)),
+      hostingProviders: distinct(reminders.map((r) => r.hostingProvider)),
+      amounts: distinct(reminders.map((r) => (r.amount !== undefined && r.amount !== null ? String(r.amount) : ""))),
+      clientProfiles,
+    });
+  } catch (err) {
+    console.error("Failed to fetch suggestions:", err);
+    res.status(500).json({ message: "Failed to fetch suggestions" });
+  }
+};

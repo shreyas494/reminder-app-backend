@@ -3,6 +3,7 @@ import {
   createReminder,
   getReminders,
   getNearExpiryReminders,
+  getReminderSuggestions,
   updateReminder,
   deleteReminder,
   cancelReminder,
@@ -25,6 +26,7 @@ router.use(authMiddleware);
 router.post("/", createReminder);
 router.get("/", getReminders);
 router.get("/near-expiry", getNearExpiryReminders);
+router.get("/suggestions", getReminderSuggestions);
 
 /* EDIT (details only) */
 router.put("/:id", updateReminder);
