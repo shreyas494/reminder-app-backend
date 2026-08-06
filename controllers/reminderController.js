@@ -80,7 +80,7 @@ export const createReminder = async (req, res) => {
       amount: amount ? Number(amount) : undefined,
 
       recurringEnabled: !!recurringEnabled,
-      recurringInterval: recurringEnabled ? recurringInterval : undefined,
+      recurringInterval: recurringEnabled ? (recurringInterval || "weekly") : undefined,
 
       reminderAt,
       status: "active",
